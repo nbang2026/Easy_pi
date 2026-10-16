@@ -1,0 +1,28 @@
+name: easy_pi Windows source only
+
+on:
+  workflow_dispatch:
+
+jobs:
+  source:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.22.2
+          architecture: x64
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: node scripts/prepare-windows-runtime.mjs
+      - run: pnpm check
+      - run: pnpm test
+      - run: node scripts/package-source.mjs --output=artifacts/easy_pi-windows-source.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: easy_pi-windows-source
+          if-no-files-found: error
+          path: artifacts/easy_pi-windows-source.zip

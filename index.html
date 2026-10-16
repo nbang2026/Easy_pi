@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="zh">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#f7f8fa" />
+    <link rel="icon" href="/app-icon.png" />
+    <title>easy_pi · 工作台</title>
+  </head>
+  <body>
+    <video id="wallpaper" autoplay muted loop playsinline src="/wallpaper.mp4" poster="/wallpaper-poster.jpg"></video>
+    <img id="wallpaper-image" alt="" />
+    <aside id="quickbar" aria-label="工作区">
+      <div class="brand"><img src="/app-icon.png" alt="easy_pi" /><span>easy_pi</span><button id="sidebar-close" class="icon-button mobile-only" type="button" data-icon="x" data-i18n-title="ui.close"></button></div>
+      <button id="new-session" class="new-session" type="button"><i data-icon="square-pen"></i><span data-i18n="ui.newSession">新建会话</span><i data-icon="plus"></i></button>
+      <div class="workspace-label" data-i18n="ui.workspace">工作区</div>
+      <button id="workspace-choose" class="workspace-location" type="button" title="选择工作区"><i data-icon="folder-open"></i><div><span data-i18n="ui.localWorkspace">本地工作区</span><small id="workspace-path">~</small></div><i data-icon="chevron-down"></i></button>
+      <details id="sidebar-recents" class="sidebar-command-group sidebar-recents" open>
+        <summary><i data-icon="history"></i><span data-feature="history">会话历史</span><i data-icon="chevron-down"></i></summary>
+        <div class="sidebar-recents-heading"><span data-feature="recent">最近</span><button id="sidebar-recents-refresh" class="icon-button" type="button" data-icon="refresh-cw" title="刷新"></button></div>
+        <nav id="sidebar-recents-list" class="sidebar-recents-list" aria-label="最近会话"></nav>
+        <button id="sidebar-history-open" class="sidebar-history-manage" type="button"><i data-icon="list"></i><span data-feature="allSessions">全部会话</span></button>
+      </details>
+      <details class="sidebar-command-group">
+      <summary><i data-icon="terminal-square"></i><span data-feature="command">Pi 指令</span><i data-icon="chevron-down"></i></summary>
+      <div class="sidebar-section-title"><span data-i18n="quickbar.title">快捷指令</span><div><button id="quickbar-reset-btn" class="icon-button" type="button" data-icon="rotate-ccw" data-i18n-title="quickbar.reset"></button><button id="quickbar-add-btn" class="icon-button" type="button" data-icon="plus" data-i18n-title="quickbar.add"></button></div></div>
+      <label class="search-field sidebar-search"><i data-icon="search"></i><input id="quick-search" type="search" data-i18n-ph="ui.searchCommands" placeholder="搜索指令" autocomplete="off" /></label>
+      <div id="quickbar-edit" class="quickbar-edit" hidden>
+        <input id="quickbar-edit-label" class="settings-input" data-i18n-ph="quickbar.label" placeholder="名称" maxlength="60" />
+        <input id="quickbar-edit-cmd" class="settings-input" data-i18n-ph="quickbar.cmd" placeholder="指令，如 /model" spellcheck="false" maxlength="2000" />
+        <div class="settings-options"><button id="quickbar-edit-save" class="primary-button" type="button" data-i18n="btn.save">保存</button><button id="quickbar-edit-cancel" type="button" data-i18n="btn.cancel">取消</button></div>
+      </div>
+      <div id="quickbar-confirm" class="quickbar-confirm" hidden>
+        <div id="quickbar-confirm-text"></div>
+        <div class="settings-options"><button id="quickbar-confirm-ok" class="danger-button" type="button" data-i18n="btn.delete">删除</button><button id="quickbar-confirm-cancel" type="button" data-i18n="btn.cancel">取消</button></div>
+      </div>
+      <nav id="quickbar-list" class="quickbar-list" aria-label="快捷指令"></nav>
+      </details>
+      <div class="sidebar-bottom">
+        <button id="appearance-open" class="appearance-shortcut" type="button"><img src="/wallpaper-poster.jpg" alt="" /><span data-i18n="ui.appearance">外观与壁纸</span><i data-icon="chevron-right"></i></button>
+        <button id="settings-toggle" class="sidebar-settings" type="button" data-i18n-title="title.settings"><i data-icon="settings-2"></i><span data-i18n="settings.title">设置</span><span class="version">v1.0.3</span></button>
+      </div>
+    </aside>
+    <button id="sidebar-backdrop" class="sidebar-backdrop" type="button" aria-label="关闭侧边栏" hidden></button>
+    <main id="app-main">
+      <header class="app-header">
+        <div class="breadcrumb"><button id="quickbar-toggle" class="icon-button" type="button" data-icon="panel-left" data-i18n-title="title.quickbar" aria-controls="quickbar" aria-expanded="true"></button><span data-i18n="ui.workbench">工作台</span><i data-icon="chevron-right"></i><strong data-i18n="ui.terminalSession">终端会话</strong></div>
+        <div id="connection-status" class="connection-status" role="status"><span></span><span id="connection-label" data-i18n="ui.connecting">正在连接</span></div>
+      </header>
+      <div class="workbench-area">
+      <section class="terminal-workspace" aria-label="终端会话">
+        <div class="terminal-toolbar">
+          <div class="terminal-tab"><i data-icon="terminal-square"></i><span data-i18n="ui.currentSession">当前会话</span><span class="tab-dot"></span></div>
+          <div class="terminal-tools">
+            <button id="wallpaper-toggle" class="icon-button" type="button" data-icon="image" data-i18n-title="title.wallpaperToggle" aria-pressed="false"></button>
+            <button id="hide-toggle" class="icon-button" type="button" data-icon="eye" data-i18n-title="title.hideCode" aria-pressed="false"></button>
+            <button id="floating-settings" class="icon-button immersive-only" type="button" data-icon="settings-2" data-i18n-title="title.settings"></button>
+            <button id="wallpaper-type" class="icon-button" type="button" data-icon="type" data-i18n-title="ui.typography"></button>
+            <button id="fullscreen-toggle" class="icon-button" type="button" data-icon="maximize" data-i18n-title="ui.enterFullscreen" aria-pressed="false"></button>
+            <button id="frame-toggle" class="icon-button" type="button" data-icon="panel-top-close" data-i18n-title="ui.hideFrame" aria-pressed="false"></button>
+          </div>
+        </div>
+        <div id="terminal-stage">
+          <div id="terminal"></div>
+          <div id="terminal-welcome" hidden>
+            <img src="/app-icon.png" alt="Pi" />
+            <h1>easy_pi</h1>
+            <p data-i18n="ui.newSession">新建会话</p>
+            <div class="welcome-actions">
+              <button id="welcome-session" type="button"><i data-icon="square-pen"></i><span data-i18n="ui.newSession">新建会话</span><i data-icon="arrow-up-right"></i></button>
+              <button id="welcome-model" type="button"><i data-icon="box"></i><span data-i18n="ui.chooseModel">选择模型</span><i data-icon="arrow-up-right"></i></button>
+              <button id="welcome-resume" type="button"><i data-icon="history"></i><span data-i18n="ui.resumeSession">恢复会话</span><i data-icon="arrow-up-right"></i></button>
+            </div>
+            <span class="preview-label" data-i18n="ui.browserPreview">浏览器预览</span>
+          </div>
+          <div id="connection-error" hidden role="alert">
+            <i data-icon="unplug"></i><h2 data-i18n="ui.connectionFailed">未能连接 Pi</h2><p id="connection-error-text"></p>
+            <div class="settings-options"><button id="retry-connection" class="primary-button" type="button"><i data-icon="refresh-cw"></i><span data-i18n="ui.retry">重新连接</span></button><button id="error-settings" type="button" data-i18n="settings.title">设置</button></div>
+          </div>
+          <div id="drop-indicator" aria-hidden="true"><i data-icon="file-plus-2"></i></div>
+        </div>
+        <section id="composer" class="composer" aria-label="输入">
+          <div class="composer-surface">
+            <div id="composer-attachments" class="composer-attachments"></div>
+            <textarea id="composer-input" rows="2" placeholder="向 Pi 发送消息…" aria-label="消息" spellcheck="false"></textarea>
+            <div id="composer-error" class="composer-error" role="alert" hidden></div>
+            <div class="composer-controls">
+              <div><button id="attach-file" class="icon-button" type="button" data-icon="paperclip" title="添加文件"></button><button id="composer-command" class="icon-button" type="button" data-icon="slash" title="Pi 指令"></button><span id="agent-status" class="agent-status" role="status">未连接</span></div>
+              <div><span id="queued-status" class="queued-status" hidden>有排队输入</span><button id="composer-stop" class="icon-button" type="button" data-icon="square" title="停止任务" hidden></button><button id="composer-send" class="icon-button send-button" type="button" data-icon="arrow-up" data-sound="send" title="发送消息" disabled></button></div>
+            </div>
+          </div>
+        </section>
+        <footer id="input-tools" class="terminal-footer input-tools" aria-label="输入与工作工具">
+          <div class="input-tools-inner">
+          <div class="model-controls">
+            <button id="model-open" class="model-trigger" type="button"><i data-icon="box"></i><span id="current-model" data-i18n="ui.chooseModel">选择模型</span><i data-icon="chevron-down"></i></button>
+            <label class="effort-control" data-i18n-title="title.thinking"><i data-icon="brain"></i><select id="thinking-select" aria-label="模型强度"></select></label>
+            <label class="effort-control agent-control" data-i18n-title="library.activeTitle" title="当前 Agent"><i data-icon="bot"></i><select id="agent-select" aria-label="当前 Agent"><option value="" data-i18n="library.noAgent">默认 Pi</option></select></label>
+          </div>
+          <div id="sendmode-bar" role="group" aria-label="发送模式"><button type="button" class="sendmode" data-mode="send" data-i18n-title="sendmode.send"><i data-icon="arrow-up"></i><span data-i18n="sendmode.send">发送</span></button><button type="button" class="sendmode" data-mode="control" data-i18n-title="sendmode.control"><i data-icon="sliders-horizontal"></i><span data-i18n="sendmode.control">控制</span></button><button type="button" class="sendmode" data-mode="queue" data-i18n-title="sendmode.queue"><i data-icon="list-end"></i><span data-i18n="sendmode.queue">排队任务</span></button></div>
+          <div class="work-tools-anchor">
+            <button id="work-tools-toggle" class="icon-button" type="button" data-icon="wrench" title="工作工具" aria-label="工作工具" aria-haspopup="menu" aria-controls="work-tools-menu" aria-expanded="false"></button>
+            <div id="work-tools-menu" class="work-tools-menu" role="menu" aria-label="工作工具" hidden>
+              <div class="work-tools-group" role="group" aria-label="工作区">
+                <button id="files-open" type="button" role="menuitem"><i data-icon="files"></i><span data-feature="files">文件</span></button>
+                <button id="review-open" type="button" role="menuitem"><i data-icon="git-pull-request"></i><span data-feature="review">审阅</span><small id="change-count"></small></button>
+                <button id="history-open" type="button" role="menuitem"><i data-icon="history"></i><span data-feature="history">会话历史</span></button>
+              </div>
+              <div class="work-tools-group" role="group" aria-label="输入">
+                <button id="palette-open" type="button" role="menuitem"><i data-icon="search"></i><span data-feature="palette">指令面板</span></button>
+                <button id="composer-toggle" type="button" role="menuitemcheckbox" aria-checked="true" aria-pressed="true"><i data-icon="text-cursor-input"></i><span data-feature="input">独立输入栏</span></button>
+                <button id="export-terminal" type="button" role="menuitem"><i data-icon="download"></i><span data-i18n="ui.exportTerminal">导出会话</span></button>
+              </div>
+              <div class="work-tools-group" role="group" aria-label="应用">
+                <button id="work-tools-settings" type="button" role="menuitem"><i data-icon="settings-2"></i><span data-feature="settings">设置</span></button>
+                <button id="diagnostics-open" type="button" role="menuitem"><i data-icon="shield-check"></i><span data-feature="diagnostics">自动检验</span><small id="diagnostics-count"></small></button>
+              </div>
+            </div>
+          </div>
+          <button id="scroll-bottom" class="icon-button" type="button" data-icon="arrow-down-to-line" data-i18n-title="ui.scrollBottom"></button>
+          <span id="terminal-size" class="terminal-size" hidden></span>
+          </div>
+        </footer>
+      </section>
+      <aside id="tool-panel" class="tool-panel" hidden>
+        <header class="tool-panel-header"><strong id="tool-panel-title">文件</strong><div><button id="tool-refresh" class="icon-button" type="button" data-icon="refresh-cw" title="刷新"></button><button id="tool-close" class="icon-button" type="button" data-icon="x" title="关闭"></button></div></header>
+        <div id="tool-message" class="tool-message" role="status" hidden></div>
+        <section id="files-view" class="tool-view" hidden>
+          <label class="search-field"><i data-icon="search"></i><input id="file-search" type="search" placeholder="搜索文件…" aria-label="搜索文件" /></label>
+          <div id="file-breadcrumb" class="file-breadcrumb"></div><div id="file-list" class="tool-list"></div>
+          <div id="file-editor" class="file-editor" hidden><header><span id="file-editor-name"></span><div><button id="file-reference" class="icon-button" type="button" data-icon="at-sign" title="加入输入"></button><button id="file-save" class="icon-button" type="button" data-icon="save" title="保存" disabled></button><button id="file-editor-close" class="icon-button" type="button" data-icon="x" title="关闭文件"></button></div></header><textarea id="file-editor-text" spellcheck="false" aria-label="文件内容"></textarea></div>
+        </section>
+        <section id="history-view" class="tool-view" hidden>
+          <label class="search-field"><i data-icon="search"></i><input id="history-search" type="search" placeholder="搜索会话…" aria-label="搜索会话" /></label>
+          <div class="history-filters"><select id="history-scope" aria-label="工作区范围"><option value="workspace">当前工作区</option><option value="all">全部工作区</option></select><button id="archive-toggle" class="icon-button" type="button" data-icon="archive" title="已归档" aria-pressed="false"></button></div>
+          <div id="history-list" class="tool-list"></div>
+        </section>
+        <section id="review-view" class="tool-view" hidden>
+          <div class="review-controls"><select id="review-mode" aria-label="审阅范围"><option value="working">未暂存</option><option value="staged">已暂存</option><option value="branch">分支对比</option></select><select id="review-base" aria-label="对比分支" hidden></select><span id="review-branch"></span></div>
+          <div id="review-list" class="tool-list"></div>
+          <header class="diff-header"><span id="diff-filename"></span><button id="diff-stage" class="icon-button" type="button" data-icon="plus" title="暂存文件" hidden></button></header><pre id="diff-content" class="diff-content"></pre>
+        </section>
+        <section id="diagnostics-view" class="tool-view" hidden><div id="diagnostics-list"></div><small id="diagnostics-time"></small></section>
+      </aside>
+      </div>
+      <footer class="app-statusbar"><span><i data-icon="hard-drive"></i><span id="status-workspace">~</span></span><span><span class="local-dot"></span><span id="runtime-label" data-i18n="ui.localProcess">本地进程</span></span></footer>
+    </main>
+    <div id="command-palette" class="palette-backdrop" hidden>
+      <section class="command-palette" role="dialog" aria-modal="true" aria-label="指令面板">
+        <header><i data-icon="search"></i><input id="palette-search" type="search" placeholder="搜索指令、会话…" aria-label="搜索指令和会话" autocomplete="off" /><button id="palette-close" class="icon-button" type="button" data-icon="x" title="关闭"></button></header>
+        <div id="palette-results" class="palette-results" role="listbox"></div>
+      </section>
+    </div>
+    <div id="toast" role="status" aria-live="polite"></div>
+    <div id="settings-panel" class="modal-backdrop" hidden>
+      <section class="settings-dialog" role="dialog" aria-modal="true" aria-labelledby="settings-heading">
+        <header class="settings-header"><div><i data-icon="settings-2"></i><h2 id="settings-heading" data-i18n="settings.title">设置</h2></div><button id="settings-close" class="icon-button" type="button" data-icon="x" data-i18n-title="ui.close"></button></header>
+        <nav class="settings-tabs" role="tablist" aria-label="设置">
+          <button id="tab-models" type="button" role="tab" aria-controls="pane-models" data-tab="models"><i data-icon="box"></i><span data-i18n="ui.modelsConnection">模型与连接</span></button>
+          <button id="tab-appearance" type="button" role="tab" aria-controls="pane-appearance" data-tab="appearance"><i data-icon="palette"></i><span data-i18n="ui.appearanceTab">外观</span></button>
+          <button id="tab-shortcuts" type="button" role="tab" aria-controls="pane-shortcuts" data-tab="shortcuts"><i data-icon="keyboard"></i><span data-i18n="settings.keybindings">快捷键设置</span></button>
+          <button id="tab-agents" type="button" role="tab" aria-controls="pane-agents" data-tab="agents"><i data-icon="bot"></i><span data-i18n="library.heading">Agent 与记忆</span></button>
+          <button id="tab-market" type="button" role="tab" aria-controls="pane-market" data-tab="market"><i data-icon="bot"></i><span data-i18n="market.title">Agent 市场</span></button>
+          <button id="tab-extensions" type="button" role="tab" aria-controls="pane-extensions" data-tab="extensions"><i data-icon="blocks"></i><span data-i18n="ui.extensions">扩展</span></button>
+        </nav>
+        <div class="settings-content">
+          <section id="pane-models" class="settings-pane" role="tabpanel" aria-labelledby="tab-models" data-pane="models">
+            <div class="section-heading"><h3 data-i18n="settings.model">模型</h3><button id="models-refresh" class="icon-button" type="button" data-icon="refresh-cw" data-i18n-title="ui.refresh"></button></div>
+            <label class="search-field"><i data-icon="search"></i><input id="model-search" type="search" data-i18n-ph="settings.search" placeholder="搜索模型…" spellcheck="false" /></label>
+            <div class="model-toolbar"><label class="model-select-all"><input id="models-select-all" type="checkbox" /><span data-i18n="ui.selectAllModels">全选</span></label><span id="models-selected-count" class="model-selected-count"></span><button id="models-remove-selected" type="button" data-i18n="ui.deleteSelectedModels" disabled>删除选中模型</button><button id="models-clear" class="danger-text" type="button" data-i18n="ui.clearModels" disabled>清空模型列表</button></div>
+            <div id="model-list" class="model-list" aria-live="polite"></div>
+            <button id="models-restore" type="button" hidden data-i18n="ui.restoreModels">恢复已移除模型</button>
+            <details class="settings-details"><summary data-i18n="settings.addModel">添加模型</summary><div class="settings-col">
+              <div class="form-grid"><label><span data-i18n="ui.provider">供应商</span><input id="model-add-provider" class="settings-input" data-i18n-ph="ph.provider" spellcheck="false" /></label><label><span data-i18n="ui.protocol">API 协议</span><select id="model-add-api" class="settings-input"><option value="openai-completions">openai-completions</option><option value="openai-responses">openai-responses</option><option value="anthropic-messages">anthropic-messages</option><option value="google-generative-ai">google-generative-ai</option><option value="mistral-conversations">mistral-conversations</option></select></label></div>
+              <label><span>Base URL</span><input id="model-add-baseurl" class="settings-input" type="url" data-i18n-ph="ph.baseurl" spellcheck="false" /></label>
+              <label><span>API Key</span><input id="model-add-apikey" class="settings-input" type="password" data-i18n-ph="ph.apikey" autocomplete="off" spellcheck="false" /></label>
+              <div class="form-grid"><label><span data-i18n="ui.modelId">模型 ID</span><input id="model-add-id" class="settings-input" data-i18n-ph="ph.modelid" spellcheck="false" /></label><label><span data-i18n="ui.displayName">显示名称</span><input id="model-add-name" class="settings-input" data-i18n-ph="ph.modelname" /></label></div>
+              <div class="settings-options"><button id="model-add-btn" class="primary-button" type="button" data-i18n="btn.add">添加</button></div><div id="model-add-status" class="settings-hint" role="status"></div>
+            </div></details>
+            <details class="settings-details"><summary data-i18n="settings.relay">中转站（OpenAI 兼容）</summary><div class="settings-col">
+              <input id="relay-baseurl" class="settings-input" type="url" data-i18n-ph="ph.relayBaseurl" spellcheck="false" />
+              <input id="relay-apikey" class="settings-input" type="password" data-i18n-ph="ph.apikey2" autocomplete="off" spellcheck="false" />
+              <input id="relay-models" class="settings-input" data-i18n-ph="ph.relayModels" spellcheck="false" />
+              <div class="settings-options"><button id="relay-add-btn" class="primary-button" type="button" data-i18n="btn.addRelay">添加中转站</button></div><div id="relay-status" class="settings-hint" role="status"></div>
+            </div></details>
+            <h3 class="section-heading" data-i18n="ui.runtime">运行环境</h3>
+            <dl class="runtime-info"><div><dt data-i18n="ui.executable">Pi 路径</dt><dd id="runtime-executable">—</dd></div><div><dt data-i18n="ui.workspace">工作区</dt><dd id="runtime-cwd">—</dd></div></dl>
+          </section>
+          <section id="pane-appearance" class="settings-pane" role="tabpanel" aria-labelledby="tab-appearance" data-pane="appearance" hidden>
+            <div class="settings-row"><label for="language-select" class="settings-label" data-i18n="settings.language">语言</label><div class="settings-options"><select id="language-select" class="settings-input"></select><button id="language-import-btn" type="button" data-i18n="btn.importLang">导入语言包</button><input id="language-file" type="file" accept=".json,application/json" hidden /></div></div>
+            <div class="settings-row"><span class="settings-label" data-i18n="settings.fontSize">字体大小</span><div class="number-control"><button id="font-decrease" class="icon-button" type="button" data-icon="minus" data-i18n-title="ui.decreaseFont"></button><output id="font-size-value">14 px</output><button id="font-increase" class="icon-button" type="button" data-icon="plus" data-i18n-title="ui.increaseFont"></button></div></div>
+            <div class="settings-row"><span class="settings-label" data-i18n="settings.wallpaperUiSize">壁纸界面字号</span><div class="number-control"><button id="ui-font-decrease" class="icon-button" type="button" data-icon="minus" data-i18n-title="ui.decreaseFont"></button><output id="ui-font-size-value">14 px</output><button id="ui-font-increase" class="icon-button" type="button" data-icon="plus" data-i18n-title="ui.increaseFont"></button></div></div>
+            <div class="settings-row"><label for="wallpaper-density" class="settings-label" data-i18n="settings.wallpaperControls">壁纸控件大小</label><select id="wallpaper-density" class="settings-input setting-select"><option value="compact" data-i18n="settings.compact">紧凑</option><option value="comfortable" data-i18n="settings.comfortable">舒适</option></select></div>
+            <div class="settings-row"><span class="settings-label" data-i18n="settings.wallpaperInk">壁纸文字颜色</span><div id="wallpaper-ink" class="swatch-options" role="group" aria-label="壁纸文字颜色"><button type="button" data-ink="dark" class="ink-swatch dark-ink" data-i18n-title="settings.darkInk" aria-pressed="true"><i data-icon="sun"></i></button><button type="button" data-ink="light" class="ink-swatch light-ink" data-i18n-title="settings.lightInk" aria-pressed="false"><i data-icon="moon"></i></button></div></div>
+            <div class="settings-row"><label for="renderer-switch" class="settings-label" data-i18n="settings.fastRenderer">终端加速</label><div class="settings-options"><span id="renderer-status" class="settings-hint" role="status"></span><input id="renderer-switch" class="switch" type="checkbox" role="switch" aria-label="终端加速" /></div></div>
+            <div class="settings-row"><label for="opacity-range" class="settings-label" data-i18n="settings.opacity">透明度</label><div class="settings-options"><input id="opacity-range" class="settings-range" type="range" min="20" max="100" step="5" /><output id="opacity-value"></output></div></div>
+            <div class="settings-row"><span class="settings-label" data-i18n="settings.wallpaper">动态壁纸</span><input id="wallpaper-switch" class="switch" type="checkbox" role="switch" aria-label="动态壁纸" /></div>
+            <div class="wallpaper-preview"><img src="/wallpaper-poster.jpg" alt="" /><div><i data-icon="image"></i><span id="wallpaper-preview-label">默认壁纸</span></div></div>
+            <div class="settings-col"><div class="settings-options"><button id="wallpaper-pick" type="button"><i data-icon="upload"></i><span data-i18n="btn.pickFile">选择文件…</span></button><button id="wallpaper-reset" type="button" data-i18n="btn.resetDefault">恢复默认</button></div><div id="wallpaper-name" class="settings-hint"></div><input id="wallpaper-file" type="file" accept="video/*,image/*" hidden /></div>
+            <h3 class="section-heading" data-i18n="wallpaper.defaults">默认壁纸</h3>
+            <div id="wallpaper-presets" class="wallpaper-presets" role="group" aria-label="默认壁纸"></div>
+            <h3 class="section-heading" data-i18n="sound.heading">音效</h3>
+            <div class="settings-row"><label for="sound-switch" class="settings-label" data-i18n="sound.enabled">界面音效</label><input id="sound-switch" class="switch" type="checkbox" role="switch" data-sound="none" aria-label="界面音效" /></div>
+            <div class="settings-row"><label for="sound-typing-switch" class="settings-label" data-i18n="sound.typing">打字音效</label><input id="sound-typing-switch" class="switch" type="checkbox" role="switch" data-sound="none" aria-label="打字音效" /></div>
+            <div class="settings-row"><label for="sound-scroll-switch" class="settings-label" data-i18n="sound.scroll">滚动音效</label><input id="sound-scroll-switch" class="switch" type="checkbox" role="switch" data-sound="none" aria-label="滚动音效" /></div>
+            <div class="settings-row"><label for="sound-volume" class="settings-label" data-i18n="sound.volume">音量</label><div class="settings-options"><input id="sound-volume" class="settings-range" type="range" min="0" max="100" step="1" data-sound="none" /><output id="sound-volume-value" for="sound-volume">25%</output></div></div>
+            <div class="settings-row"><label for="sound-pack" class="settings-label" data-i18n="sound.pack">声音包</label><select id="sound-pack" class="settings-input setting-select" data-sound="none"></select></div>
+            <div class="settings-col"><div class="settings-options"><button id="sound-import" type="button"><i data-icon="upload"></i><span data-i18n="sound.import">导入声音包</span></button><button id="sound-preview" class="icon-button" type="button" data-icon="volume-2" data-sound="none" data-i18n-title="sound.preview"></button><button id="sound-reset" class="icon-button" type="button" data-icon="rotate-ccw" data-i18n-title="sound.reset"></button><button id="sound-remove" class="icon-button danger-text" type="button" data-icon="trash-2" data-i18n-title="sound.remove" disabled></button></div><div id="sound-status" class="settings-hint" role="status"></div><input id="sound-file" type="file" accept=".zip,.wav,.mp3,.m4a,.ogg" hidden /></div>
+          </section>
+          <section id="pane-shortcuts" class="settings-pane" role="tabpanel" aria-labelledby="tab-shortcuts" data-pane="shortcuts" hidden>
+            <div class="settings-row"><span class="settings-label" data-i18n="settings.escDouble">ESC 双击中断</span><input id="esc-switch" class="switch" type="checkbox" role="switch" aria-label="ESC 双击中断" /></div>
+            <label class="search-field"><i data-icon="search"></i><input id="keybind-search" type="search" data-i18n-ph="settings.keybindSearch" placeholder="搜索动作…" spellcheck="false" /></label><div id="keybind-status" class="settings-hint" role="status"></div><div id="keybind-list" class="keybind-list"></div>
+          </section>
+          <section id="pane-extensions" class="settings-pane" role="tabpanel" aria-labelledby="tab-extensions" data-pane="extensions" hidden>
+            <h3 data-i18n="settings.importPlugin">导入插件</h3><div class="settings-col"><input id="plugin-source" class="settings-input" data-i18n-ph="ph.pluginSource" spellcheck="false" /><div class="settings-options"><button id="plugin-install-btn" class="primary-button" type="button" data-i18n="btn.import">导入</button></div><div id="plugin-status" class="settings-hint" role="status"></div></div>
+            <h3 class="section-heading" data-i18n="settings.persona">导入模型人设</h3><div class="settings-col"><div class="settings-warn" data-i18n="settings.personaWarn">人设会占用上下文，可能降低使用性能与指令遵循度，请谨慎导入。</div><textarea id="persona-text" class="settings-input settings-textarea" spellcheck="false" data-i18n-ph="settings.personaPh"></textarea><div class="settings-options"><button id="persona-import-btn" type="button" data-i18n="btn.importFile">导入文件</button><button id="persona-save-btn" class="primary-button" type="button" data-i18n="btn.save">保存</button><button id="persona-clear-btn" class="danger-text" type="button" data-i18n="btn.clear">清除</button></div><input id="persona-file" type="file" accept=".md,.txt,text/plain,text/markdown" hidden /><div id="persona-status" class="settings-hint" role="status"></div></div>
+          </section>
+          <section id="pane-market" class="settings-pane" role="tabpanel" aria-labelledby="tab-market" data-pane="market" hidden>
+            <div class="section-heading"><h3 data-i18n="market.title">Agent 市场</h3><button id="market-refresh" class="icon-button" type="button" data-icon="refresh-cw" data-i18n-title="ui.refresh"></button></div>
+            <p class="settings-hint market-scope" data-i18n="market.scope">仅支持文本 Agent：不安装 DSH 插件、主题、MCP 服务或可执行代码。</p>
+            <div class="market-active-row"><span id="market-active-label"></span><button id="market-deactivate" type="button" hidden data-i18n="market.default">恢复默认 Pi</button><button id="market-open-library" type="button" data-i18n="market.openLibrary">管理本地库</button></div>
+            <label class="search-field"><i data-icon="search"></i><input id="market-search" type="search" data-i18n-ph="market.search" placeholder="搜索 Agent…" /></label>
+            <div class="market-filters"><select id="market-category" class="settings-input" aria-label="Agent category"><option value="all" data-i18n="market.category.all">全部分类</option><option value="engineering" data-i18n="market.category.engineering">工程开发</option><option value="writing" data-i18n="market.category.writing">文档写作</option><option value="planning" data-i18n="market.category.planning">规划设计</option><option value="analysis" data-i18n="market.category.analysis">数据分析</option><option value="external" data-i18n="market.category.external">GitHub 导入</option></select><label><input id="market-installed-only" type="checkbox" /><span data-i18n="market.installedOnly">仅已导入</span></label></div>
+            <div id="market-status" class="settings-hint" role="status"></div>
+            <div id="market-list" class="market-grid"></div>
+            <details class="settings-details"><summary data-i18n="market.github">从 GitHub 导入文本 Agent</summary><p class="settings-hint" data-i18n="market.githubHint">只接受公开 GitHub 的具体 .md/.txt 文件，先预览后导入，不跟随重定向。</p><div class="library-download"><input id="market-source" class="settings-input" type="url" spellcheck="false" data-i18n-ph="library.source" /><button id="market-preview-url" type="button" data-i18n="market.preview">预览</button></div></details>
+            <section id="market-detail" class="market-detail" hidden><header><h3 id="market-detail-title"></h3><button id="market-detail-close" class="icon-button" type="button" data-icon="x" data-i18n-title="ui.close"></button></header><p id="market-detail-meta" class="settings-hint"></p><pre id="market-content" tabindex="0"></pre><label class="market-consent"><input id="market-consent" type="checkbox" /><span data-i18n="market.consent">我已阅读全文，确认仅作为不可信的角色参考文本导入，不授予额外权限。</span></label><div class="settings-options"><button id="market-import" class="primary-button" type="button" disabled>导入本地库</button><button id="market-activate" type="button" hidden>设为当前 Agent</button></div></section>
+          </section>
+          <section id="pane-agents" class="settings-pane" role="tabpanel" aria-labelledby="tab-agents" data-pane="agents" hidden>
+            <div class="settings-row"><label for="memory-switch" class="settings-label" data-i18n="library.memoryEnabled">Agent 记忆</label><input id="memory-switch" class="switch" type="checkbox" role="switch" aria-label="Agent 记忆" /></div>
+            <div class="settings-row"><label for="agent-download-switch" class="settings-label" data-i18n="library.autonomous">模型自主下载 Agent</label><input id="agent-download-switch" class="switch" type="checkbox" role="switch" aria-label="模型自主下载 Agent" /></div>
+            <div class="library-toolbar"><select id="library-kind" class="settings-input" aria-label="资料类型"><option value="memory" data-i18n="library.memories">记忆库</option><option value="agent" data-i18n="library.agents">Agent 库</option></select><button id="library-new" class="icon-button" type="button" data-icon="plus" data-i18n-title="library.new"></button><button id="library-refresh" class="icon-button" type="button" data-icon="refresh-cw" data-i18n-title="ui.refresh"></button></div>
+            <label class="search-field"><i data-icon="search"></i><input id="library-search" type="search" data-i18n-ph="library.search" placeholder="搜索资料…" /></label>
+            <div id="agent-download-row" class="library-download" hidden><input id="agent-source" class="settings-input" type="url" data-i18n-ph="library.source" placeholder="GitHub Agent 文件链接" spellcheck="false" /><button id="agent-download" class="icon-button" type="button" data-icon="download" data-i18n-title="library.download"></button></div>
+            <div id="library-list" class="library-list"></div>
+            <div class="settings-col"><label for="library-title" data-i18n="library.title">名称</label><input id="library-title" class="settings-input" maxlength="80" spellcheck="false" /><label for="library-content" data-i18n="library.content">内容</label><textarea id="library-content" class="settings-input settings-textarea" spellcheck="false"></textarea><div class="settings-options"><button id="library-save" class="primary-button" type="button"><i data-icon="save"></i><span data-i18n="btn.save">保存</span></button><button id="library-activate" type="button" hidden><i data-icon="bot"></i><span id="library-activate-label" data-i18n="library.activate">设为当前 Agent</span></button><button id="library-remove" class="icon-button danger-text" type="button" data-icon="trash-2" data-i18n-title="btn.delete" disabled></button></div></div>
+            <div id="library-status" class="settings-hint" role="status"></div>
+          </section>
+        </div>
+        <footer class="settings-footer"><span>easy_pi Desktop</span><span id="settings-environment" data-i18n="ui.localProcess">本地进程</span></footer>
+      </section>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

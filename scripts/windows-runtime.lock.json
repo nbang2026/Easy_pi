@@ -1,0 +1,10 @@
+{
+  "format": 1,
+  "source": "Pi 1.3.0 production dependencies staged with bun for win32/x64; npm cmd-shim generated launchers; official Node 22.22.2 win-x64 preserved",
+  "archiveSha256": "a1c8d2bc0ae5aa8df1a70673d7199e2cc3c364783e7e5362e5d784e81a421bd0",
+  "nodeExecutableSha256": "ae1a50511be58e987483fdbc12125407443926d2d394669ade2352776e920dd3",
+  "entrySha256": "e79626f2dd6f94aa45d30f3fa63cd84319a6eefcd150b353cfaf274366926774",
+  "piPackage": "@earendil-works/pi-coding-agent@1.3.0",
+  "dependencyTreeSha256": "9f6b83bf028879d711d80d9e8ce6cfe56e01190561b26dbeb485141ceef6f1b1",
+  "nodeTreeSha256": "d358ac329d2906a21e88e947f23416615a883abaf165fc31687b98ea735ec760"
+}

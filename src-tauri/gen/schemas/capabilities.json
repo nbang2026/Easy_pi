@@ -1,0 +1,1 @@
+{"default":{"identifier":"default","description":"Allow the frontend to listen to core events (needed for onDragDropEvent / drag-and-drop file adding).","local":true,"windows":["main"],"permissions":["core:default","core:event:allow-listen","core:event:allow-unlisten","core:window:allow-set-fullscreen","core:window:allow-set-decorations"]}}

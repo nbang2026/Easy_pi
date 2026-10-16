@@ -1,0 +1,12 @@
+{
+  "nodeVersion": "22.22.2",
+  "nodePlatform": "win-x64",
+  "nodeArchive": "node-v22.22.2-win-x64.zip",
+  "nodeArchiveUrl": "https://nodejs.org/dist/v22.22.2/node-v22.22.2-win-x64.zip",
+  "nodeArchiveSha256": "7c93e9d92bf68c07182b471aa187e35ee6cd08ef0f24ab060dfff605fcc1c57c",
+  "piPackage": "@earendil-works/pi-coding-agent",
+  "piVersion": "1.3.0",
+  "runtimeRoot": "src-tauri/runtime/windows-x64",
+  "nodePath": "node/node.exe",
+  "entryPath": "app/node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js"
+}

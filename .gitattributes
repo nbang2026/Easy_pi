@@ -1,0 +1,2 @@
+src-tauri/runtime/** -text
+runtime-assets/*.zip binary

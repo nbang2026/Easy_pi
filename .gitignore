@@ -1,0 +1,9 @@
+node_modules/
+dist/
+src-tauri/target/
+.windows-runtime-*/
+verification-report.json
+.DS_Store
+
+src-tauri/runtime/
+runtime-assets/
