@@ -1,8 +1,10 @@
 [package]
 name = "pi-app"
 version = "1.0.3"
-description = "Pi coding assistant wrapped in a native desktop window"
-authors = ["you"]
+description = "A desktop workbench for the Pi coding agent with graphical controls and a full terminal interface"
+authors = ["nbang2026"]
+license = "MIT"
+repository = "https://github.com/nbang2026/Easy_pi"
 edition = "2021"
 
 [lib]
