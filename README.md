@@ -78,4 +78,5 @@ Windows builds require Rust + MSVC + WiX; see `scripts/WINDOWS-RUNTIME.md`.
 
 ## License / 许可
 
-仅供个人学习与使用 / For personal learning and use only.
+本项目基于 MIT 协议开源，与官方 pi 编码智能体一致。
+This project is open source under the MIT License, the same as the official pi coding agent.
