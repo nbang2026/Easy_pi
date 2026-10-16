@@ -57,6 +57,16 @@ It is designed for Pi users who want a desktop interface without giving up the T
 
 ## 下载与安装 / Download and install
 
+> [!IMPORTANT]
+> **Windows 版本开发公告**<br>
+> **Windows development notice**
+>
+> Windows 版本仍在开发中，exe/MSI 安装包尚未发布，当前 Windows 源码与运行时准备流程仅供开发和验证。<br>
+> The Windows version is still in development; no exe/MSI installer has been released, and the current Windows source and runtime-preparation workflow is for development and verification only.
+>
+> Windows 版本发布后会在此处和 [Releases](https://github.com/nbang2026/Easy_pi/releases) 更新，请留意后续公告。<br>
+> This section and [Releases](https://github.com/nbang2026/Easy_pi/releases) will be updated when the Windows version is released; stay tuned for announcements.
+
 ### macOS Apple Silicon
 
 **[⬇ 点击直接下载 easy_pi-1.0.3-macOS-arm64.dmg](https://github.com/nbang2026/Easy_pi/releases/download/v1.0.3/easy_pi-1.0.3-macOS-arm64.dmg)**<br>

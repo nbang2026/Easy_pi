@@ -28,6 +28,13 @@ You can keep using Pi's terminal interaction and commands while managing connect
 
 ## Download and install
 
+> [!IMPORTANT]
+> **Windows development notice**
+>
+> The Windows version is still in development; no exe/MSI installer has been released, and the current Windows source and runtime-preparation workflow is for development and verification only.
+>
+> This section and [Releases](https://github.com/nbang2026/Easy_pi/releases) will be updated when the Windows version is released; stay tuned for announcements.
+
 ### macOS Apple Silicon
 
 **[⬇ Download easy_pi-1.0.3-macOS-arm64.dmg directly](https://github.com/nbang2026/Easy_pi/releases/download/v1.0.3/easy_pi-1.0.3-macOS-arm64.dmg)**
