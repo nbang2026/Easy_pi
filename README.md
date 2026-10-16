@@ -291,11 +291,112 @@ Easy_pi/
 
 欢迎提交文档、测试和代码改进。通过 [Issues](https://github.com/nbang2026/Easy_pi/issues) 反馈时，请提供版本、系统/架构、复现步骤和脱敏诊断，不要上传私人配置目录。
 
-## English overview
+## English / English Documentation
 
-**easy_pi 1.0.3** is a native desktop workspace for the real Pi coding agent. It keeps the terminal TUI while adding graphical model controls, workspace files and Git review, an eight-entry text Agent catalog, reusable local notes, session access and appearance settings. Pi and the configured model perform the tasks; easy_pi provides the desktop environment.
+### What is easy_pi?
 
-The Mac app targets Apple Silicon and uses external Node/Pi. Windows currently follows a source-kit delivery path, not an exe/MSI release pipeline. Agents are role definitions, not parallel processes. See the [full English README](README.en.md) for downloads, setup, architecture and limitations.
+**easy_pi is an open-source desktop GUI and local workbench for [Pi Coding Agent](https://pi.dev).** Pi is a terminal coding agent that uses models and local tools to explore code, modify projects, investigate problems and perform development tasks. easy_pi runs the real Pi CLI inside a native desktop window and adds model management, workspace files and Git review, session access, text Agents, local notes and appearance settings.
+
+You can keep using Pi's terminal interaction and commands while managing connections, adding file references and switching task roles through graphical controls. **Pi and the configured model perform the tasks; easy_pi provides the desktop environment rather than a separate hosted model service.**
+
+### What can it do?
+
+- **Development:** work with project files on code exploration, implementation, debugging and tests.
+- **Review and project organization:** use code-review, architecture or release-checking roles to structure a task.
+- **Documentation and analysis:** reuse writing, data-analysis and planning workflows.
+- **Model connections:** maintain providers and model settings without relying only on manual JSON editing.
+- **Reusable context:** save role definitions, project notes and conventions for subsequent tasks.
+- **Local change review:** browse files, edit text, inspect Git diffs and stage or unstage files in one workspace.
+
+### Download and install
+
+**[⬇ Download easy_pi-1.0.3-macOS-arm64.dmg directly](https://github.com/nbang2026/Easy_pi/releases/download/v1.0.3/easy_pi-1.0.3-macOS-arm64.dmg)**
+
+For macOS Apple Silicon. [All releases](https://github.com/nbang2026/Easy_pi/releases) · [SHA-256 checksum](docs/releases/v1.0.3/SHA256SUMS) · [Installer inspection record](docs/releases/v1.0.3/README.md).
+
+> The direct link requires the same-named DMG to be present in the `v1.0.3` release. The repository ZIP is a separate distribution file.
+
+Prepare external Node/Pi and a working model connection first. The pinned Windows runtime uses Pi **1.3.0**; current development and test tooling recommends Node **22.x, at least 22.19**. This does not claim that every external Pi version has been tested.
+
+```bash
+node --version
+pi --version
+npm install -g @earendil-works/pi-coding-agent
+```
+
+Mount the DMG and drag `easy_pi.app` to `Applications`, or extract the app from the ZIP. The inspected DMG is arm64, version 1.0.3 and ad-hoc signed. This is not Developer ID signing or Apple notarization, and application functionality was not exercised in the static inspection. No bundled Node/Pi was seen in the Mac app.
+
+### Features in 1.0.3
+
+#### Desktop terminal and graphical input
+
+- A Tauri v2 native window starts the real Pi CLI through a PTY.
+- xterm.js provides terminal input, scrolling, resizing and optional WebGL rendering.
+- A graphical composer, command shortcuts and session entry points complement the original TUI.
+- Structured GUI actions call Pi editor/context APIs instead of creating a second model session.
+- Regular and wallpaper layouts share the same terminal/process; some commands still require terminal selectors.
+
+#### Models and connections
+
+Open **Settings → Models & connections** to add or edit custom models, including names, IDs, API protocols, endpoints and keys. The interface supports catalog/custom entries, row checkboxes, selecting current search results, deleting selected entries, clearing the list and restoring removed models.
+
+Saved API Keys are not echoed back. Leaving the key field empty preserves the existing key; several models may share one provider key. This is configuration management, not model-weight downloading, local inference hosting or proof that a provider connection works. Reload or restart Pi when prompted.
+
+#### Agent Market and local memory
+
+The market contains eight text roles: Code Reviewer, Bug Investigator, Test Engineer, Technical Writer, Architecture Mapper, Release Checker, Data Analyst and Task Planner. Search, categories, installed filtering, full-text previews and public GitHub `.md`/`.txt` imports are supported.
+
+**Preview, import and activation are separate decisions.** Import does not activate a role; duplicate imports preserve local edits, and the default Pi role can be restored. Agents are role/workflow definitions, not parallel processes. The market does not install MCP servers, themes, DSH plugins or executable code. The separate `pi install <source>` action can fetch executable third-party code and requires independent source review.
+
+Local roles and project notes can be saved and reused. Memory and autonomous text-Agent downloads are enabled by default and can be disabled. Context injection is bounded; this is not unlimited memory or automatic retrieval of all history.
+
+#### Workspace files, Git and sessions
+
+- Select a local project, browse its tree and search file paths.
+- Read/edit existing UTF-8 text files; save operations check external modifications.
+- Add local file references to a draft by selection or drag and drop; dropping does not send the task immediately.
+- Review unstaged/staged diffs and branch comparisons, and stage/unstage individual files.
+- Read/resume Pi sessions, with search and local pin/archive presentation.
+
+The editor currently limits files to 512 KiB. Search matches paths, not full text. Git features require external Git and are not a complete commit/push/merge client. Parts of the current attachment/path UI assume POSIX-style paths, so Windows compatibility still needs work.
+
+#### Appearance
+
+Chinese/English strings, static wallpapers, video backgrounds, transparency effects, fonts, sounds and shortcuts are configurable. Layout changes reuse the same Pi workflow; they do not create a new session.
+
+### Develop and build
+
+Recommended baseline: Node 22.x (at least 22.19), pnpm 9, Rust/Cargo stable and platform-native prerequisites. macOS builds require Xcode Command Line Tools; full desktop integration requires working Pi.
+
+```bash
+git clone https://github.com/nbang2026/Easy_pi.git
+cd Easy_pi
+pnpm install --frozen-lockfile
+pnpm check
+pnpm test
+pnpm tauri dev
+```
+
+`pnpm dev` only previews the frontend at `http://localhost:1420`; it does not provide the complete native Pi backend. Build a macOS app with `pnpm tauri build --bundles app`. The output is normally `src-tauri/target/release/bundle/macos/easy_pi.app`; external Node/Pi is not automatically bundled and the command does not create a notarized DMG.
+
+```bash
+pnpm build
+cargo test --manifest-path src-tauri/Cargo.toml --lib
+pnpm verify
+```
+
+Frontend, Rust, real-Pi and installer checks are separate verification layers. Windows currently follows a source-only path: the pinned Node/Pi archive is not tracked in Git, and the current wrapper does not create an exe/MSI installer. See [Development and verification](docs/DEVELOPMENT.md) and [Windows runtime/source delivery](scripts/WINDOWS-RUNTIME.md).
+
+### Architecture and privacy
+
+```text
+TypeScript UI / xterm.js ── Tauri IPC ──> Rust desktop backend ── PTY ──> Pi CLI
+          GUI state/actions ── authenticated local bridge ──> session Pi extension
+```
+
+The default GUI configuration directory is `~/.pi/agent/`, not `~/.config/pi/`. Model configuration may contain API Keys; do not commit personal configuration, authentication files, sessions or logs. Local storage does not mean local-only inference: roles, notes and project content included in requests may be sent to the selected provider.
+
+Workspace path checks and bridge authentication are not an OS sandbox for Pi tools. This is a local desktop application, not a hosted multi-tenant platform or parallel-agent scheduler. See [Architecture](docs/ARCHITECTURE.md), [Usage](docs/USAGE.md) and [Security](SECURITY.md) for details.
 
 ## License / 许可
 
