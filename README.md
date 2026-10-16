@@ -1,3 +1,5 @@
+Windows版easy_pi.exe正在制作请稍等
+Building easy_pi.exe for Windows, please wait
 <div align="center">
   <img src="app-icon.png" width="96" alt="easy_pi 应用图标 / easy_pi app icon" />
   <h1>easy_pi</h1>
