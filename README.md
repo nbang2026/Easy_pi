@@ -3,6 +3,7 @@
   <h1>easy_pi</h1>
   <p><strong>让 Pi 编码智能体走出终端，成为触手可及的桌面工作台。</strong></p>
   <p>原生桌面窗口 · 图形交互与完整 TUI · 模型管理 · Agent 本地库 · 文件与 Git 工作台</p>
+  <p><strong><a href="https://github.com/nbang2026/Easy_pi/releases/download/v1.0.3/easy_pi-1.0.3-macOS-arm64.dmg">⬇ 点击直接下载 · macOS Apple Silicon（DMG）</a></strong></p>
   <p><a href="README.en.md">English</a> · <a href="https://github.com/nbang2026/Easy_pi/releases">下载与发布</a> · <a href="docs/USAGE.md">使用指南</a> · <a href="docs/ARCHITECTURE.md">工程架构</a> · <a href="LICENSE">MIT License</a></p>
 </div>
 
@@ -64,7 +65,11 @@
 
 ### 1. 获取应用或源码
 
-macOS Apple Silicon 用户请查看 [v1.0.3 发布页](https://github.com/nbang2026/Easy_pi/releases/tag/v1.0.3) 的 Assets，选择 `easy_pi-1.0.3-macOS-arm64.dmg`。只有资产列表中实际出现该文件，才表示安装盘已经上传；若没有，请勿把仓库根目录 ZIP 当作同一个文件。
+**[⬇ 点击直接下载 easy_pi-1.0.3-macOS-arm64.dmg](https://github.com/nbang2026/Easy_pi/releases/download/v1.0.3/easy_pi-1.0.3-macOS-arm64.dmg)**
+
+适用于 macOS Apple Silicon（M 系列芯片）。使用上面的直链下载，无需先进入发布页查找附件。[查看全部版本](https://github.com/nbang2026/Easy_pi/releases) · [SHA-256 校验](docs/releases/v1.0.3/SHA256SUMS)。
+
+> 该直链在 DMG 上传到 `v1.0.3` Release 后生效；若返回 404，请查看发布页确认附件是否已发布。仓库中的 ZIP 是独立文件。
 
 安装步骤：下载 DMG → 核对 [SHA-256](docs/releases/v1.0.3/SHA256SUMS) → 双击挂载 → 将 `easy_pi.app` 拖到 `Applications` → 从应用程序目录启动。现有 ZIP 也可作为独立分发格式，解压后使用其中的应用。
 

@@ -3,6 +3,7 @@
   <h1>easy_pi</h1>
   <p><strong>A native desktop workbench for the Pi coding agent.</strong></p>
   <p>Graphical controls · Real terminal TUI · Model management · Text Agent library · Files & Git</p>
+  <p><strong><a href="https://github.com/nbang2026/Easy_pi/releases/download/v1.0.3/easy_pi-1.0.3-macOS-arm64.dmg">⬇ Direct download · macOS Apple Silicon (DMG)</a></strong></p>
   <p><a href="README.md">简体中文</a> · <a href="https://github.com/nbang2026/Easy_pi/releases">Releases</a> · <a href="docs/ARCHITECTURE.md">Architecture (中文)</a> · <a href="LICENSE">MIT License</a></p>
 </div>
 
@@ -56,7 +57,11 @@ Minimum OS versions, memory usage, signing/notarization and installer sizes are 
 
 ### 1. Obtain a trusted build
 
-For Apple Silicon, check the Assets list on the [v1.0.3 release page](https://github.com/nbang2026/Easy_pi/releases/tag/v1.0.3) for `easy_pi-1.0.3-macOS-arm64.dmg`. It is uploaded only when it actually appears there; the repository ZIP is a separate file.
+**[⬇ Download easy_pi-1.0.3-macOS-arm64.dmg directly](https://github.com/nbang2026/Easy_pi/releases/download/v1.0.3/easy_pi-1.0.3-macOS-arm64.dmg)**
+
+For macOS Apple Silicon (M-series chips). Use the direct link without navigating the release Assets list. [All releases](https://github.com/nbang2026/Easy_pi/releases) · [SHA-256 checksum](docs/releases/v1.0.3/SHA256SUMS).
+
+> The link works once the DMG is uploaded to the `v1.0.3` release. If it returns 404, check the release page for publication status. The repository ZIP is a separate file.
 
 Download the DMG, compare its [SHA-256](docs/releases/v1.0.3/SHA256SUMS), mount it, and drag `easy_pi.app` to `Applications`. The inspected installer contains an arm64 app with version 1.0.3 and an **ad-hoc signature**. Image integrity and local signature verification passed; this is not Developer ID signing, and Apple notarization or application functionality was not verified in this documentation task. See the [installer inspection record](docs/releases/v1.0.3/README.md). Verify provenance instead of disabling system protections.
 
