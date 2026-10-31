@@ -1,269 +1,253 @@
-Windows版easy_pi.exe正在制作请稍等
-Building easy_pi.exe for Windows, please wait
 <div align="center">
   <img src="app-icon.png" width="96" alt="easy_pi 应用图标 / easy_pi app icon" />
   <h1>easy_pi</h1>
-  <p><strong>让 Pi 编码智能体拥有一个更直观的桌面工作环境。</strong></p>
-  <p><strong>A more intuitive desktop workspace for the Pi coding agent.</strong></p>
-  <p>版本 1.0.3 · Tauri v2 · Rust · TypeScript · Vite · xterm.js</p>
-  <p>Version 1.0.3 · Tauri v2 · Rust · TypeScript · Vite · xterm.js</p>
-  <p><strong><a href="https://github.com/nbang2026/Easy_pi/releases/download/v1.0.3/easy_pi-1.0.3-macOS-arm64.dmg">⬇ 直接下载 easy_pi 1.0.3 · macOS Apple Silicon（DMG）</a></strong></p>
-  <p><strong><a href="https://github.com/nbang2026/Easy_pi/releases/download/v1.0.3/easy_pi-1.0.3-macOS-arm64.dmg">⬇ Direct download · macOS Apple Silicon (DMG)</a></strong></p>
-  <p><a href="README.en.md">纯英文版 / English-only README</a> · <a href="https://github.com/nbang2026/Easy_pi/releases">全部版本 / All releases</a> · <a href="docs/USAGE.md">使用指南 / Usage</a> · <a href="docs/ARCHITECTURE.md">工程架构 / Architecture</a> · <a href="LICENSE">MIT License</a></p>
+  <p><strong>让 Pi 与 Claude 编码智能体拥有一个更直观的桌面工作环境。</strong></p>
+  <p><strong>A more intuitive desktop workspace for Pi and Claude coding agents.</strong></p>
+  <p>Windows x64 · macOS Apple Silicon · Tauri v2 · Rust · TypeScript · Vite · xterm.js</p>
+  <p><strong><a href="https://github.com/nbang2026/Easy_pi/releases">Windows 安装包与 macOS 应用 / Windows installers &amp; macOS apps</a></strong></p>
+  <p><a href="README.en.md">纯英文版 / English-only README</a> · <a href="https://github.com/nbang2026/Easy_pi/releases">全部版本 / All releases</a> · <a href="BUILDING.md">开发与构建 / Build guide</a> · <a href="https://github.com/nbang2026/Easy_pi/issues">问题反馈 / Issues</a> · <a href="https://github.com/nbang2026/Easy_pi/blob/main/LICENSE">MIT License</a></p>
 </div>
 
 ---
 
 ## 项目介绍 / Introduction
 
-**easy_pi 是为 [Pi Coding Agent](https://pi.dev) 开发的开源桌面图形界面与本地工作台。**<br>
-**easy_pi is an open-source desktop GUI and local workbench for [Pi Coding Agent](https://pi.dev).**
+**easy_pi 是围绕 [Pi Coding Agent](https://pi.dev) 与独立 Claude 引擎构建的桌面图形界面和本地工作台，支持 Windows 与 macOS。**<br>
+**easy_pi is a desktop GUI and local workbench built around [Pi Coding Agent](https://pi.dev) and an independent Claude engine, available for Windows and macOS.**
 
-Pi 是运行在终端中的 AI 编码智能体，可以结合模型和本地工具协助阅读代码、修改项目、排查问题和执行开发任务。<br>
-Pi is a terminal-based coding agent that works with models and local tools to explore code, modify projects, investigate issues, and perform development tasks.
+它将模型连接、项目会话、文件与 Git、Agent / Skill、权限审批、任务记录和用量分析集中到原生桌面窗口，让开发任务更容易开展、跟进和检查。<br>
+It brings model connections, project sessions, files, Git review, Agent / Skill libraries, permission approvals, task records and usage analysis into a native desktop window.
 
-easy_pi 将真实的 Pi CLI 放进原生桌面窗口，并围绕它提供模型管理、文件与 Git 工作区、会话入口、Agent 市场、本地记忆资料库和外观设置，让日常操作更直观。<br>
-easy_pi runs the real Pi CLI in a native desktop window and adds model management, a file and Git workbench, session access, an Agent Market, local memory, and appearance settings.
+你可以使用图形对话和工作台，也可以保留简洁终端交互；壁纸、字体和音效用于个性化，不改变引擎与项目的边界。<br>
+Use the graphical conversation and workbench or keep a compact terminal workflow. Wallpapers, fonts and sounds personalize the interface without merging engine or project boundaries.
 
-你可以继续使用 Pi 原有的终端交互和指令，也可以通过图形界面配置模型、添加文件引用和切换任务角色。<br>
-Keep using Pi's original terminal interactions and commands, or use the graphical interface to configure models, add file references, and switch task roles.
-
-**easy_pi 不提供模型服务，也不替代 Pi 核心；实际任务由 Pi、用户配置的模型和本地工具共同完成。**<br>
-**easy_pi does not provide a model service or replace Pi; tasks are performed by Pi together with your configured model and local tools.**
-
-本项目适合希望保留 Pi TUI、同时获得桌面操作入口的用户，也适合研究 Tauri、PTY 与 Agent 扩展桥接的开发者。<br>
-It is designed for Pi users who want a desktop interface without giving up the TUI, and for developers exploring Tauri, PTYs, and Agent-extension bridges.
+**easy_pi 提供的是桌面 Harness，不提供模型服务或免费额度，也不替代 Pi / Claude 核心。实际任务由选定引擎、你配置的模型和本地工具完成。**<br>
+**easy_pi provides a desktop harness, not hosted models or free credits. Tasks are performed by the selected engine, your configured model and local tools.**
 
 ### 可以用来做什么？ / What can you do with it?
 
-- **辅助开发：** 结合项目文件，让 Pi 协助理解代码、实现功能、排查错误和补充测试。<br>
-  **Development:** Give Pi project context to help explore code, implement features, debug issues, and add tests.
-- **审查与整理项目：** 使用代码审查、架构梳理或发布验收角色组织任务流程。<br>
-  **Review and organize projects:** Use code-review, architecture, or release-checking roles to structure a workflow.
-- **文档与分析：** 复用技术写作、数据分析和任务规划角色，处理代码之外的工作。<br>
-  **Documentation and analysis:** Reuse technical-writing, data-analysis, and planning roles for work beyond coding.
-- **管理模型连接：** 通过界面维护供应商、模型和连接设置，减少手工编辑配置文件。<br>
-  **Manage model connections:** Maintain providers, models, and connection settings in the UI instead of editing configuration files by hand.
-- **复用项目上下文：** 保存角色定义、项目笔记和约定，供后续任务参考。<br>
-  **Reuse project context:** Save role definitions, project notes, and conventions for later tasks.
-- **查看本地变更：** 在同一工作台中浏览文件、编辑文本、检查 Git 差异和暂存状态。<br>
-  **Review local changes:** Browse files, edit text, inspect Git diffs, and stage changes in one workbench.
+- **辅助开发：** 结合项目文件理解代码、实现功能、排查错误和补充测试。<br>
+  **Development:** Explore code, implement features, investigate issues and add tests with project context.
+- **审查与整理项目：** 浏览文件、编辑文本、检查 Git 差异和暂存状态。<br>
+  **Review projects:** Browse files, edit text, inspect Git diffs and review staging state.
+- **组织智能体工作：** 管理角色与技能，按任务选用，并在允许范围内协调只读子任务。<br>
+  **Organize agent work:** Manage roles and skills, select them for tasks and coordinate constrained read-only child tasks.
+- **复用上下文：** 保存项目笔记、角色定义和工作约定，为后续任务提供参考。<br>
+  **Reuse context:** Keep project notes, role definitions and conventions available for later tasks.
+- **控制执行过程：** 查看工具请求、确认权限、配置额度、停止任务和检查结果。<br>
+  **Control execution:** Review tool requests, approve permissions, configure budgets, stop tasks and inspect results.
+- **查看使用情况：** 通过趋势、明细和日历热力查看模型用量与已知费用。<br>
+  **Understand usage:** Review model usage and known costs through trends, records and calendar heatmaps.
 
-### easy_pi 与 Pi 的分工 / What easy_pi and Pi each provide
+### easy_pi 与执行引擎的分工 / What easy_pi and the engines provide
 
-| easy_pi 提供 / easy_pi provides | Pi 与外部环境提供 / Pi and the environment provide |
+| easy_pi 提供 / easy_pi provides | 引擎与外部环境提供 / Engines and environment provide |
 | --- | --- |
-| 桌面窗口、图形输入、终端显示和工作台。<br>Desktop window, graphical input, terminal display, and workbench. | 模型请求、上下文处理、编码 Agent 与工具执行。<br>Model requests, context processing, coding-agent behavior, and tool execution. |
-| 模型配置、本地角色库和文本 Agent 预览。<br>Model configuration, local role library, and text-Agent previews. | 模型供应商、API Key 或 Pi 支持的认证方式。<br>Model providers, API keys, or an authentication method supported by Pi. |
-| Pi 进程启动、运行时查找和本地桥接。<br>Pi process startup, runtime discovery, and the local bridge. | Node/Pi 运行时、Git、项目依赖和开发工具。<br>Node/Pi runtimes, Git, project dependencies, and development tools. |
+| 桌面界面、输入栏、终端显示、工作台和项目入口。<br>Desktop UI, composer, terminal display, workbench and projects. | Pi / Claude 执行、模型请求、上下文处理与工具能力。<br>Pi / Claude execution, model requests, context processing and tools. |
+| 模型连接、角色与技能管理、权限审批和任务记录。<br>Connection settings, role/skill management, approvals and task records. | 模型服务、API Key 或相应引擎支持的认证。<br>Model services, API keys or engine-supported authentication. |
+| 会话入口、本地记忆、用量展示与运行环境检查。<br>Session access, local memory, usage views and environment checks. | Git、项目依赖、SDK 和平台工具；部分运行资源可随包提供。<br>Git, project dependencies, SDKs and platform tools; some runtimes may be bundled. |
 
 ## 下载与安装 / Download and install
 
 > [!IMPORTANT]
-> **Windows 版本开发公告**<br>
-> **Windows development notice**
+> **Windows 与 macOS 双平台 / Windows and macOS**
 >
-> Windows 版本仍在开发中，exe/MSI 安装包尚未发布，当前 Windows 源码与运行时准备流程仅供开发和验证。<br>
-> The Windows version is still in development; no exe/MSI installer has been released, and the current Windows source and runtime-preparation workflow is for development and verification only.
+> Windows 版现已有安装包，不再仅限源码。请在 [Releases](https://github.com/nbang2026/Easy_pi/releases) 中选择实际提供的对应平台附件；不同平台可能采用不同版本号。<br>
+> Windows installers now exist; Windows is no longer source-only. Select an actual platform-specific asset from [Releases](https://github.com/nbang2026/Easy_pi/releases). Platform versions may differ.
 >
-> Windows 版本发布后会在此处和 [Releases](https://github.com/nbang2026/Easy_pi/releases) 更新，请留意后续公告。<br>
-> This section and [Releases](https://github.com/nbang2026/Easy_pi/releases) will be updated when the Windows version is released; stay tuned for announcements.
+> 生成安装包与上传 GitHub 是两件事；发布页未列出的新包不代表已公开下载。GitHub 自动生成的 Source code ZIP 不是应用安装器，含环境源码包也不是已安装 App。<br>
+> Building and uploading are separate steps. A new package absent from Releases is not publicly downloadable there. GitHub-generated source ZIPs and source-with-environment kits are not application installers.
+
+> [!WARNING]
+> **2026-10-31 发布检查 / Publication check**：本次收到的 Windows PiRepair3 安装程序与源码 ZIP 均不完整，未上传到本次发布。Windows 附件待取得完整文件并核验后补充；请勿把当前下载入口视为已有有效的 Windows 附件。<br>
+> The supplied Windows PiRepair3 installer and source ZIP are truncated and excluded from this release. Windows assets are pending intact files and verification; the download entry does not imply a valid Windows asset is currently available.
+
+### Windows x64
+
+**[查看 Windows 安装附件 / View Windows installation assets](https://github.com/nbang2026/Easy_pi/releases)**
+
+1. 下载对应版本的 `.exe` 安装程序；若该版本提供 `.msi`，也可选择 MSI。<br>
+   Download the release's `.exe` installer, or its `.msi` if one is provided.
+2. 核对来源与随包 SHA-256，按向导安装并启动 easy_pi。<br>
+   Verify provenance and the accompanying SHA-256, then install and launch easy_pi.
+3. 在设置中检查运行环境，配置模型连接，选择项目并开始任务。<br>
+   Check the runtime in Settings, configure a model connection and select a project.
+
+完整 Windows 构建配置包含目标平台的 Node / Pi、Claude / DSH 运行资源，并配置随安装器携带 WebView2 离线安装资源。具体附件的内置内容和签名状态以该版本说明为准，不能仅根据文件名或大小判断。<br>
+The full Windows build configuration includes target-specific Node / Pi and Claude / DSH resources and carries WebView2 offline installation resources. Check each package's notes for its actual contents and signing state; filenames or size alone are not evidence.
+
+Git / Git Bash、项目自身的 SDK、账号与模型额度仍需自行准备。<br>
+Git / Git Bash, project-specific SDKs, accounts and model credits remain your responsibility.
 
 ### macOS Apple Silicon
 
-**[⬇ 点击直接下载 easy_pi-1.0.3-macOS-arm64.dmg](https://github.com/nbang2026/Easy_pi/releases/download/v1.0.3/easy_pi-1.0.3-macOS-arm64.dmg)**<br>
-**[⬇ Download easy_pi-1.0.3-macOS-arm64.dmg directly](https://github.com/nbang2026/Easy_pi/releases/download/v1.0.3/easy_pi-1.0.3-macOS-arm64.dmg)**
+**[查看 macOS 应用附件 / View macOS application assets](https://github.com/nbang2026/Easy_pi/releases)**
 
-此安装包适用于 Apple Silicon（M 系列芯片）Mac。<br>
-This installer is for Apple Silicon (M-series) Macs.
+1. 下载对应 Apple Silicon / arm64 的应用 ZIP，或该版本实际提供的 DMG，核对 SHA-256。<br>
+   Download an Apple Silicon / arm64 application ZIP, or a DMG if provided, and verify its SHA-256.
+2. 解压 ZIP 或挂载 DMG，将 `easy_pi.app` 放入 Applications。<br>
+   Extract the ZIP or mount the DMG and move `easy_pi.app` into Applications.
+3. 检查本地运行环境与引擎连接，配置模型并选择项目。<br>
+   Check the local runtime and engine connection, configure a model and select a project.
 
-[全部版本 / All releases](https://github.com/nbang2026/Easy_pi/releases) · [SHA-256 校验 / Checksum](docs/releases/v1.0.3/SHA256SUMS) · [安装盘检查记录 / Installer inspection](docs/releases/v1.0.3/README.md)
+现有 Mac App 的 Pi 模式需要外部 **Node.js 22.19+** 与可用的 Pi CLI；已配套验证的 Pi 核心为 **1.3.0**。Claude 运行资源按构建准备，认证与网络连接仍需自行配置。<br>
+Existing Mac Apps require external **Node.js 22.19+** and a working Pi CLI for Pi mode; the paired tested Pi core is **1.3.0**. Claude resources are prepared per build, while authentication and connectivity require your configuration.
 
-若直链返回 404，请检查 `v1.0.3` 发布页中是否仍有同名附件；仓库根目录的应用 ZIP 是独立文件。<br>
-If the direct link returns 404, check whether the same-named asset is present in the `v1.0.3` release; the app ZIP in the repository is a separate file.
-
-使用前需要准备外部 Node、Pi CLI 和可用的模型连接。<br>
-Before launching the app, prepare Node, the Pi CLI, and a working model connection.
-
-本仓库固定 Windows 运行时使用 Pi **1.3.0**；当前开发和测试工具链建议使用 Node **22.x，至少 22.19**，但这不代表所有外部 Pi 版本都已验证兼容。<br>
-The pinned Windows runtime uses Pi **1.3.0**; current development and test tooling recommends Node **22.x, at least 22.19**, but this does not mean every external Pi version has been tested for compatibility.
-
-Pi 的安装和认证方式请参考 [Pi 官方说明](https://pi.dev)。<br>
-See the [Pi documentation](https://pi.dev) for installation and authentication.
-
-```bash
-node --version
-pi --version
-npm install -g @earendil-works/pi-coding-agent
-```
-
-1. 下载 DMG 并核对 SHA-256。<br>
-   Download the DMG and verify its SHA-256 checksum.
-2. 双击挂载 DMG，将 `easy_pi.app` 拖入 Applications；若使用 ZIP，请先解压。<br>
-   Mount the DMG and drag `easy_pi.app` to Applications, or extract the app from the ZIP.
-3. 启动 easy_pi，确认本地 Pi 与图形桥接连接成功。<br>
-   Launch easy_pi and confirm that Pi and the GUI bridge are connected.
-4. 配置模型、选择工作区并开始任务。<br>
-   Configure a model, select a workspace, and start a task.
-
-已检查的 DMG 包含 arm64、版本 1.0.3 的应用，镜像完整性和本地静态签名校验通过。<br>
-The inspected DMG contains an arm64 app, version 1.0.3; disk-image integrity and local static signature checks passed.
-
-该应用采用 **ad-hoc 签名**，不代表 Developer ID 签名或 Apple 公证；此次检查也没有运行应用进行功能验证，且未发现捆绑的 Node/Pi。<br>
-The app uses an **ad-hoc signature**, not Developer ID signing or Apple notarization; the app was not run for functional testing, and no bundled Node/Pi was found.
-
-请核实下载来源，不要为了绕过系统提示而关闭 macOS 安全保护。<br>
-Verify the download source; do not disable macOS security protections to bypass a warning.
+现有 Mac 候选采用 **ad-hoc 临时签名，未 Apple 公证**。请核验来源并遵循系统提示，不要关闭系统安全保护。<br>
+Existing Mac candidates are **ad-hoc signed, not Apple notarized**. Verify their source and follow system prompts without disabling security protections.
 
 ### 平台与交付范围 / Platforms and distribution status
 
-| 平台 / Platform | 当前内容与边界 / Current contents and limitations |
+| 平台 / Platform | 当前内容与边界 / Contents and limitations |
 | --- | --- |
-| macOS Apple Silicon / arm64 | 提供 DMG 和仓库应用 ZIP；需要外部 Node/Pi。<br>DMG and repository app ZIP are available; external Node/Pi is required. |
-| Windows x64 | 当前为源码包与固定运行时准备流程，不生成 easy_pi exe/MSI；所需离线档案未被 Git 跟踪。<br>Currently a source-kit and pinned-runtime preparation path, not an easy_pi exe/MSI release; the required offline archive is not tracked in Git. |
-| macOS Intel / Linux / 移动平台<br>macOS Intel / Linux / Mobile | 存在部分跨平台代码不等于已有发行包或完成实测。<br>Some cross-platform code does not imply a release build or completed testing. |
+| Windows x64 | 应用安装包与源码流程；内置资源、签名和实机验证按附件说明。<br>Application installers and source workflows; consult package notes for runtimes, signing and native validation. |
+| macOS Apple Silicon / arm64 | 原生 App；Pi 模式需要外部 Node/Pi，另有独立的含环境源码包。<br>Native App; Pi mode requires external Node/Pi. A separate source-with-environment kit is also available. |
+| 其他架构与平台 / Other architectures and platforms | 部分跨平台代码不等于已有发行包或完成实测。<br>Cross-platform code does not establish a release or completed validation. |
 
-本地运行不代表离线推理；模型请求、GitHub 预览和联网工具仍可能访问外部服务。<br>
-Local execution does not mean offline inference; model requests, GitHub previews, and network tools may contact external services.
+升级前先结束活动任务并退出旧版，保留必要备份，再安装或替换应用。Pi 更新提醒不等于应用自动更新。<br>
+End active tasks, quit the previous version and keep necessary backups before upgrading. A Pi update notice is not an application auto-updater.
 
-## 1.0.3 主要功能 / Features in 1.0.3
+## 主要功能 / Features
 
-### 桌面终端与图形输入 / Desktop terminal and graphical input
+### 图形对话、终端与输入 / Conversations, terminal and input
 
-- 基于 Tauri v2 的原生桌面窗口通过 PTY 启动真实 Pi CLI。<br>
-  A Tauri v2 desktop window launches the real Pi CLI through a PTY.
-- xterm.js 显示终端交互，支持输入、滚动、尺寸调整和可选 WebGL 渲染。<br>
-  xterm.js displays terminal interaction with input, scrolling, resizing, and optional WebGL rendering.
-- 图形输入栏、常用指令和会话入口与原生 TUI 配合使用。<br>
-  A graphical composer, command shortcuts, and session entry points complement the native TUI.
-- 图形操作通过结构化桥接调用 Pi 编辑器和上下文接口，不会另起一套模型会话。<br>
-  Structured bridge actions call Pi's editor and context APIs instead of creating a separate model session.
-- 常规布局和壁纸布局共用一个终端与 Pi 进程；部分选择器仍需在终端中完成。<br>
-  Regular and wallpaper layouts share one terminal and Pi process; some selectors still require terminal interaction.
+- 图形对话与工作台用于日常任务，简洁终端模式保留原生 Pi 交互。<br>
+  Graphical conversation and the workbench support daily tasks, while compact terminal mode retains native Pi interaction.
+- Tauri 原生后端管理 Pi 进程、PTY 与本地桥接，xterm.js 负责终端显示。<br>
+  The Tauri backend manages Pi processes, PTYs and the local bridge; xterm.js renders the terminal.
+- 输入栏支持文件引用、指令提示、快捷键、草稿保护及中文输入法提交保护。<br>
+  The composer supports file references, command suggestions, shortcuts, draft protection and IME submission guards.
+- Pi 的发送、控制与排队按引擎能力提供，不把某个引擎的操作冒充另一个引擎的功能。<br>
+  Pi send, control and queue operations follow engine capabilities rather than being presented as universal commands.
+
+### Pi / Claude / 自动选择 / Pi, Claude and Auto
+
+Pi 与 Claude 保持独立的执行状态与会话边界。自动模式在提交前选择一个执行引擎，不是第三个核心，也不会把两套会话合并。<br>
+Pi and Claude keep separate execution states and session boundaries. Auto selects one engine before submission; it is not a third core or a merged conversation.
+
+思考强度与工作角色分别设置；是否支持某一强度或工具，取决于所选模型与引擎。<br>
+Thinking level and work role are separate settings. Available levels and tools depend on the selected model and engine.
 
 ### 模型管理 / Model management
 
-入口：**设置 → 模型与连接**。<br>
-Open **Settings → Models & connections**.
+按服务商集中管理 API 地址、协议、密钥和模型，并支持模型搜索、选择与批量管理。<br>
+Manage API endpoints, protocols, keys and models by provider, with search, selection and bulk operations.
 
-可以添加或编辑自定义模型，包括名称、模型 ID、API 协议、服务地址和密钥。<br>
-Add or edit custom models, including their name, model ID, API protocol, endpoint, and key.
-
-模型列表支持逐行选择、全选当前搜索结果、批量删除、清空和恢复已移除模型。<br>
-The model list supports row selection, selecting current search results, batch deletion, clearing, and restoring removed models.
-
-已保存的 API Key 不会回显；编辑时将密钥留空表示保留原值。<br>
-Saved API keys are not echoed back; leave the key field empty when editing to preserve the existing value.
-
-同一供应商下多个模型可能共享一个密钥；删除模型条目不会自动删除供应商密钥或地址。<br>
-Multiple models from one provider may share a key; deleting a model entry does not automatically delete the provider key or endpoint.
-
-这是模型连接配置，不是模型权重下载器或本地推理服务；模型出现在列表中也不代表在线连接已验证。<br>
-This is model-connection configuration, not a model-weight downloader or local inference service; a model appearing in the list does not verify online connectivity.
-
-保存后按提示执行 `/reload` 或重启 Pi。<br>
-After saving, run `/reload` or restart Pi as prompted.
+已保存密钥不回显，编辑时留空保留旧值；同一服务商的模型可能共享连接设置。模型出现在列表中不代表连接已验证，也不代表已经下载模型权重。<br>
+Saved keys are not echoed back; leaving a key field empty preserves its value. Models may share provider settings. A listed model is neither a verified connection nor downloaded model weights.
 
 ### Agent 市场 / Agent Market
 
-入口：**设置 → Agent 市场**，内置八种文本角色模板。<br>
-Open **Settings → Agent Market** to browse eight built-in text roles.
+在线目录、内置精选与已下载条目集中管理，支持搜索、分类、全文预览和本地角色管理。<br>
+Browse online catalogs, built-in selections and downloaded entries with search, categories, full-text previews and local role management.
 
-| Agent | 用途 / Purpose |
-| --- | --- |
-| 代码审查 / Code Reviewer | 检查真实变更并定位可复现问题。<br>Review real changes and identify reproducible issues. |
-| 故障排查 / Bug Investigator | 复现问题、分析根因并验证修复。<br>Reproduce issues, investigate causes, and verify fixes. |
-| 测试工程师 / Test Engineer | 设计边界、异常和回归测试。<br>Design boundary, error, and regression tests. |
-| 技术文档 / Technical Writer | 编写基于代码的说明和教程。<br>Write implementation-grounded documentation and tutorials. |
-| 架构梳理 / Architecture Mapper | 整理模块职责、依赖和数据流。<br>Map module responsibilities, dependencies, and data flow. |
-| 发布验收 / Release Checker | 检查版本、依赖、产物和验证范围。<br>Check versions, dependencies, artifacts, and verification scope. |
-| 数据分析 / Data Analyst | 校验数据并进行可复查分析。<br>Validate data and produce reviewable analysis. |
-| 任务规划 / Task Planner | 将目标拆分为可验证的交付步骤。<br>Break goals into verifiable deliverables. |
+**预览、下载和启用是独立步骤。** 下载不会自动启用，也不应覆盖已有的本地编辑。外部条目的来源、工具要求和许可需自行审查。<br>
+**Preview, download and activation are separate decisions.** Downloading does not activate a role or overwrite local edits. Review external entries' provenance, tool requirements and licenses.
 
-市场支持搜索、分类、已导入筛选、全文预览，以及公开 GitHub `.md` / `.txt` 的预览导入。<br>
-The market supports search, categories, installed-item filtering, full-text previews, and preview/import of public GitHub `.md` / `.txt` files.
+角色定义本身不是独立并行进程，也不授予终端或网络权限；单独的插件安装入口可能获取可执行代码，不能与文本市场混为一谈。<br>
+A role definition is not an independent process and grants no terminal or network access. A separate plugin-install action may fetch executable code and must not be confused with the text market.
 
-**预览、导入和启用是三个独立步骤**；导入不会自动启用，重复导入也不会覆盖已有的本地编辑。<br>
-**Preview, import, and activation are separate steps**; importing does not activate a role or overwrite an existing local edit.
+### Skill 商店与本地库 / Skill store and library
 
-Agent 是角色与工作流程定义，不是并行运行的独立智能体；同一时间只激活一个全局角色。<br>
-Agents are role and workflow definitions, not independent parallel processes; only one global role is active at a time.
+可以搜索与预览技能、查看 `SKILL.md` 和配套文件、下载到本地，并管理启用、停用、检查更新和移除。<br>
+Search and preview skills, inspect `SKILL.md` and supporting files, download locally, and manage activation, updates and removal.
 
-市场不安装 DSH 插件、主题、MCP 服务或可执行代码；单独的 `pi install <source>` 入口可能获取可执行第三方代码，需自行审查来源。<br>
-The market does not install DSH plugins, themes, MCP servers, or executable code; the separate `pi install <source>` action may fetch executable third-party code and requires source review.
+下载与执行分离；启用后的应用状态仍需核对引擎是否已加载。Skill 不会自动安装系统依赖，也不能赋予引擎原本没有的工具。<br>
+Downloading and execution are separate. Activation must still be confirmed by the engine's loaded state. Skills do not install system dependencies or create tools an engine does not have.
+
+### 调度、权限与长任务 / Scheduling, permissions and long tasks
+
+根据任务组织角色与 Skill，支持有依赖关系、并发限制和取消信号的受约束只读子任务协同。普通角色条目与实际子任务执行不是同一概念，具体支持范围取决于运行引擎。<br>
+Organize roles and skills for a task and coordinate constrained read-only child tasks with dependencies, concurrency limits and cancellation. Role entries and executing child tasks are distinct, and support depends on the engine.
+
+执行控制可配置应用层权限和任务额度，保存检查点、中断记录与验收状态。停止、重发和异常提示用于帮助处理任务生命周期，不承诺任务永不中断。<br>
+Execution controls configure application permissions and task budgets and retain checkpoints, interruption records and acceptance state. Stop, resubmit and error handling assist task lifecycle management; they do not guarantee uninterrupted execution.
+
+“无限制”只取消应用额度，不绕过用户审批、系统限制、模型上下文或供应商配额。模型停止输出不等于用户验收通过。<br>
+Unlimited mode removes only the application's budget, not approvals, system limits, context limits or provider quotas. A model ending its output is not user acceptance.
 
 ### 本地资料库与记忆 / Local library and memory
 
-可以保存、搜索、阅读和编辑角色定义、项目笔记与开发约定。<br>
-Save, search, read, and edit role definitions, project notes, and development conventions.
+保存、搜索、阅读和编辑角色定义、项目笔记与工作约定，供后续任务参考。上下文注入有容量与长度限制，不是无限记忆或全部历史自动召回。<br>
+Save, search, read and edit roles, project notes and conventions for later tasks. Context injection is bounded, not unlimited memory or automatic retrieval of all history.
 
-任务开始时，当前角色和有限数量的近期笔记可以加入 Pi 上下文。<br>
-At task start, the active role and a limited number of recent notes can be added to Pi's context.
+### 工作区、文件与 Git / Workspace, files and Git
 
-记忆和模型自主下载 Agent 的设置默认开启，也可以由用户关闭。<br>
-Memory and autonomous Agent-download settings are enabled by default and can be turned off by the user.
+- 切换项目、搜索与恢复已保存会话，并分别保护输入草稿。<br>
+  Switch projects, search and resume saved sessions, and preserve drafts separately.
+- 浏览文件树、按路径搜索并编辑支持的文本文件，保存时检查外部修改。<br>
+  Browse the file tree, search paths and edit supported text files with external-change checks on save.
+- 拖入或选择文件先添加引用，不立即发送任务。<br>
+  Dropping or selecting a file adds a reference without immediately submitting a task.
+- 查看暂存、未暂存和分支差异，按文件暂存或取消暂存。<br>
+  Review staged, unstaged and branch diffs, and stage or unstage individual files.
 
-资料库容量和上下文注入长度有限，并非无限记忆或完整历史的自动召回。<br>
-Library capacity and injected context are bounded; this is not unlimited memory or automatic retrieval of the full history.
+Git 功能依赖本机 Git，不替代完整的提交、推送与合并客户端。<br>
+Git features require local Git and do not replace a complete commit, push and merge client.
 
-模型侧资料库工具不能启用角色或修改授权，但这不等于 Pi 的其他文件和命令工具被禁用。<br>
-Model-facing library tools cannot activate roles or change authorization, but this does not disable Pi's other file and command tools.
+### 用量分析与更新提醒 / Usage analysis and update notices
 
-### 工作区、文件与 Git / Workspace, files, and Git
+查看趋势、模型分布、排行、明细、日历热力和导出结果。颜色深浅按用量展示；缺失记录和未知价格不冒充完整账单或零费用。<br>
+Review trends, model breakdowns, rankings, records, calendar heatmaps and exports. Color intensity reflects usage; missing records and unknown pricing are not presented as a complete bill or zero cost.
 
-- 选择本地项目、浏览文件树，并按路径名称搜索。<br>
-  Select a local project, browse its file tree, and search by path.
-- 打开和编辑现有 UTF-8 文本文件；保存时检查外部修改。<br>
-  Open and edit existing UTF-8 text files; saves check for external modifications.
-- 拖入或选择文件，将本地 `@path` 引用加入草稿；不会立即发送任务。<br>
-  Drop or select files to add local `@path` references to a draft; this does not submit the task.
-- 查看 Git 已暂存/未暂存差异和分支比较，并逐文件暂存或取消暂存。<br>
-  Review staged/unstaged diffs and branch comparisons, and stage or unstage individual files.
-- 搜索和恢复 Pi 会话；置顶与归档只改变本地界面展示状态。<br>
-  Search and resume Pi sessions; pinning and archiving only change local UI presentation.
-
-文件编辑限制为不超过 512 KiB 的现有 UTF-8 文本，文件搜索按路径匹配而非全文检索。<br>
-Editing is limited to existing UTF-8 text files up to 512 KiB; file search matches paths rather than file contents.
-
-Git 功能依赖外部 Git，不提供完整的 commit、push 或 merge 工作流。<br>
-Git features require external Git and do not provide a complete commit, push, or merge workflow.
-
-部分附件路径逻辑仍假设 POSIX 风格路径，Windows 盘符与 UNC 路径兼容性尚需完善。<br>
-Some attachment-path logic still assumes POSIX-style paths; Windows drive-letter and UNC path support needs improvement.
+Pi 核心更新提示用于提醒，不会静默升级、重启引擎或打断活动任务。<br>
+Pi core update notices inform you without silently upgrading, restarting the engine or interrupting active work.
 
 ### 个性化界面 / Appearance and preferences
 
-可以配置中英文界面、静态和视频壁纸、透明效果、字体、声音及快捷键。<br>
-Configure Chinese/English UI strings, static and video wallpapers, transparency, fonts, sounds, and shortcuts.
-
-不同布局共用同一个 Pi 工作流；切换外观不会创建新的 Pi 会话。<br>
-Layouts share the same Pi workflow; changing appearance does not create a new Pi session.
+中英文界面、静态与动态壁纸、透明输入区、夜间 UI、自定义字体颜色与大小、字体导入、点击 / 打字 / 滚动音效、自定义声音包和快捷键设置。<br>
+Chinese/English UI, static and animated wallpapers, transparent input, night UI, custom font colors and sizes, font import, click/typing/scroll sounds, custom sound packs and shortcut settings.
 
 ## 从源码运行与构建 / Develop and build
 
-建议使用 Node 22.x（至少 22.19）、pnpm 9 和 Rust/Cargo stable。<br>
-Node 22.x (at least 22.19), pnpm 9, and stable Rust/Cargo are recommended.
-
-macOS 原生构建需要 Xcode Command Line Tools，完整桌面联调还需要可用的 Pi。<br>
-Native macOS builds require Xcode Command Line Tools; full desktop integration also requires a working Pi installation.
+需要 Node.js 22.19+、pnpm 9、Bun、Rust/Cargo 与对应平台原生工具链。macOS 需要 Xcode Command Line Tools；Windows 需要 MSVC C++ Build Tools 与 Windows SDK。<br>
+Use Node.js 22.19+, pnpm 9, Bun, Rust/Cargo and native platform prerequisites: Xcode Command Line Tools on macOS, or MSVC C++ Build Tools and Windows SDK on Windows.
 
 ```bash
 git clone https://github.com/nbang2026/Easy_pi.git
 cd Easy_pi
 pnpm install --frozen-lockfile
+cd agent-runtime
+bun install --frozen-lockfile
+cd ..
 pnpm check
 pnpm test
+```
+
+若使用带外层目录的交付源码，请进入包含 `package.json` 的 `pi-app` 目录再执行后续命令。<br>
+If your source kit has an outer wrapper, enter its `pi-app` directory containing `package.json` before running the project commands.
+
+### macOS
+
+先准备可用的外部 Node/Pi，再准备 Claude 资源并启动原生开发窗口：<br>
+Prepare external Node/Pi, stage the Claude resources and start the native development window:
+
+```bash
+node scripts/prepare-claude-runtime.mjs --platform darwin --arch arm64
 pnpm tauri dev
 ```
 
-`pnpm dev` 只启动浏览器前端预览，不包含完整 Tauri/Pi 原生后端。<br>
-`pnpm dev` starts only the browser-based frontend preview; it does not include the complete native Tauri/Pi backend.
+```bash
+# 构建 macOS App / Build the macOS App
+pnpm tauri build --bundles app
+```
 
-构建 macOS 应用可运行 `pnpm tauri build --bundles app`，默认产物为 `src-tauri/target/release/bundle/macos/easy_pi.app`。<br>
-Build the macOS app with `pnpm tauri build --bundles app`; the default output is `src-tauri/target/release/bundle/macos/easy_pi.app`.
+默认输出为 `src-tauri/target/release/bundle/macos/easy_pi.app`；此命令不完成开发者签名、公证或自动捆绑外部 Node/Pi。<br>
+Default output: `src-tauri/target/release/bundle/macos/easy_pi.app`. This command does not provide Developer ID signing, notarization or automatic external Node/Pi bundling.
 
-该命令不会自动捆绑外部 Node/Pi，也不会生成已公证的 DMG。<br>
-This command does not bundle external Node/Pi or produce a notarized DMG.
+### Windows
+
+在 Windows x64 上使用安装器构建入口：<br>
+On Windows x64, use the installer build entry point:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/build-desktop-windows.ps1
+```
+
+构建需要与锁定摘要匹配的 `runtime-assets/windows-x64-offline.zip`；新克隆的仓库不一定包含它。请先取得可信的配套归档，不要修改摘要绕过检查。脚本准备 Node/Pi 和 Claude 资源，再构建 NSIS / MSI；WebView2 构建资源可能需要联网获取。<br>
+Building requires `runtime-assets/windows-x64-offline.zip` matching the pinned hashes; a fresh clone may not include it. Obtain the trusted matching input rather than weakening validation. The script stages Node/Pi and Claude resources and builds NSIS / MSI; obtaining WebView2 build resources may need network access.
+
+### 验证 / Verification
 
 ```bash
 pnpm build
@@ -271,104 +255,82 @@ cargo test --manifest-path src-tauri/Cargo.toml --lib
 pnpm verify
 ```
 
-前端、Rust、真实 Pi 联调和安装包检查是不同验证层级，不能相互替代。<br>
-Frontend, Rust, real-Pi integration, and installer checks are different verification layers and are not interchangeable.
-
-Windows 当前是源码交付路径，固定运行时离线档案未被 Git 跟踪；交付脚本不会生成 easy_pi exe/MSI。<br>
-Windows currently follows a source-kit delivery path; its pinned offline runtime archive is not tracked in Git, and the delivery script does not build an easy_pi exe/MSI.
-
-详情见 [开发与验证指南](docs/DEVELOPMENT.md) 和 [Windows 运行时说明](scripts/WINDOWS-RUNTIME.md)。<br>
-See the [development and verification guide](docs/DEVELOPMENT.md) and [Windows runtime notes](scripts/WINDOWS-RUNTIME.md).
+前端、Rust、真实引擎联调、安装包与目标系统实测是不同层级，不能相互替代。`pnpm dev` 只启动前端预览，不提供原生后端。详细步骤见 [开发与构建](BUILDING.md)。<br>
+Frontend, Rust, real-engine integration, installer checks and target-system testing are distinct layers. `pnpm dev` is frontend-only. See the [build guide](BUILDING.md) for details.
 
 ## 技术架构 / Architecture
 
 ```text
-TypeScript UI / xterm.js ── Tauri IPC ──> Rust desktop backend ── PTY ──> Pi CLI
-          GUI state/actions ── authenticated local bridge ──> session Pi extension
+TypeScript UI / conversation / workbench / xterm.js
+                         |
+                     Tauri IPC
+                         |
+                Rust desktop backend
+                |-- Pi process / PTY / authenticated bridge
+                |      `-- Pi CLI + session GUI extension
+                |-- Independent Claude runtime / sidecar
+                `-- Files / Git / models / runtime checks
+
+Task routing / bounded child tasks / Agent & Skill libraries
+Permissions / checkpoints / local memory / usage records
 ```
 
-终端字节流保留 Pi TUI；独立的本地认证桥接负责图形输入、结构化状态和资料库操作。<br>
-The terminal byte stream preserves Pi's TUI; a separate authenticated local bridge handles graphical input, structured state, and library operations.
-
-Pi 仍是实际执行核心，easy_pi 不是独立模型服务，也不是多 Agent 调度器。<br>
-Pi remains the execution core; easy_pi is neither a standalone model service nor a multi-agent scheduler.
+Pi 与 Claude 的运行状态保持独立，自动选择在提交前完成；终端字节流与结构化图形控制使用不同通道。<br>
+Pi and Claude keep independent runtime state, with automatic routing before submission. Terminal bytes and structured GUI control use separate channels.
 
 | 工程目录 / Project path | 模块职责 / Responsibility |
 | --- | --- |
-| `src/main.ts`, `src/bridge.ts` | 前端装配、终端生命周期与 Tauri IPC。<br>Frontend assembly, terminal lifecycle, and Tauri IPC. |
-| `src/workbench.ts`, `src/model-*.ts` | 工作区、会话、Git 与模型界面。<br>Workspace, sessions, Git, and model interfaces. |
-| `src/agent-market.ts`, `src/library-settings.ts` | 文本 Agent 市场与本地资料库界面。<br>Text Agent Market and local-library interfaces. |
-| `src-tauri/src/lib.rs`, `runtime.rs` | 原生命令、PTY 生命周期、配置和运行时查找。<br>Native commands, PTY lifecycle, configuration, and runtime discovery. |
-| `src-tauri/src/gui_bridge.rs`, `gui-extension.ts` | 本地认证通信和 Pi 会话扩展。<br>Authenticated local transport and the Pi session extension. |
-| `src-tauri/src/gui-library.mjs`, `gui-market.mjs` | 角色/记忆存储、文本导入和内置目录。<br>Role/memory storage, text import, and built-in catalog. |
-| `src-tauri/src/workbench.rs`, `model_management.rs` | 文件/Git 操作与模型配置事务。<br>File/Git operations and model-configuration transactions. |
-| `public/`, `scripts/`, `.github/workflows/` | 媒体资源、测试、运行时准备和交付流程。<br>Media, tests, runtime preparation, and delivery workflows. |
+| `src/main.ts`, `src/bridge.ts` | 前端装配、生命周期与 Tauri IPC。<br>Frontend assembly, lifecycle and Tauri IPC. |
+| `src/conversation-view.ts`, `src/claude-view.ts`, `src/workbench.ts` | 对话、Claude 视图和项目工作台。<br>Conversation, Claude views and project workbench. |
+| `src/model-*.ts`, `src/agent-market.ts`, `src/skill-library.ts` | 模型、Agent 与 Skill 管理界面。<br>Model, Agent and Skill interfaces. |
+| `src-tauri/src/gui_bridge.rs`, `gui-extension.ts` | Pi 的认证通信与会话扩展。<br>Authenticated Pi transport and session extension. |
+| `src-tauri/src/claude_runtime.rs`, `agent-runtime/` | 独立 Claude 生命周期与运行资源。<br>Independent Claude lifecycle and runtime resources. |
+| `src-tauri/src/task-routing.mjs`, `task-scheduler.mjs` | 任务路由与受约束子任务调度。<br>Task routing and constrained child-task scheduling. |
+| `src-tauri/src/gui-library.mjs`, `gui-skills.mjs`, `gui-usage.mjs`, `gui-harness.mjs` | 资料库、技能、用量和执行记录。<br>Library, skills, usage and execution records. |
+| `public/`, `scripts/`, `.github/workflows/` | 媒体资源、验证、运行资源准备与构建流程。<br>Media, verification, runtime preparation and build workflows. |
 
-详细模块边界、数据流和限制见 [工程架构](docs/ARCHITECTURE.md)。<br>
-See [Architecture](docs/ARCHITECTURE.md) for module boundaries, data flow, and limitations.
+## 数据、隐私与使用边界 / Data, privacy and limitations
 
-## 数据、隐私与使用边界 / Data, privacy, and limitations
+Pi 和相关 GUI 数据默认位于 **`~/.pi/agent/`**；`PI_CODING_AGENT_DIR` 可重定向相关数据根目录。Windows 使用对应的用户主目录。Claude 保持独立的引擎会话与认证配置。<br>
+Pi and related GUI data default to **`~/.pi/agent/`**; `PI_CODING_AGENT_DIR` redirects the related data root. Windows uses the corresponding user home. Claude maintains separate engine sessions and authentication settings.
 
-默认 GUI 配置目录为 **`~/.pi/agent/`**，不是 `~/.config/pi/`。<br>
-The default GUI configuration directory is **`~/.pi/agent/`**, not `~/.config/pi/`.
-
-Windows 在 `HOME` 缺失时使用 `USERPROFILE`。<br>
-On Windows, `USERPROFILE` is used when `HOME` is missing.
-
-| 数据 / Data | 位置（相对于 `~/.pi/agent/`）/ Location (relative to `~/.pi/agent/`) |
+| 数据 / Data | 相对于 Pi 数据目录的位置 / Relative location in the Pi data directory |
 | --- | --- |
-| 自定义模型/供应商，可能包含 API Key<br>Custom models/providers, possibly containing API keys | `models.json` |
-| 模型目录与移除状态<br>Model catalog and removal state | `models-store.json` / `gui-models.json` |
-| 认证信息与 Pi 设置<br>Authentication and Pi settings | `auth.json` / `settings.json` |
-| 人设与快捷键<br>Persona and shortcuts | `APPEND_SYSTEM.md` / `keybindings.json` |
-| 会话、角色与记忆<br>Sessions, roles, and memory | `sessions/` / `gui-library/library.json` |
+| 自定义模型与服务商，可能含密钥 / Custom models/providers, possibly keys | `models.json` |
+| 模型目录与移除状态 / Model catalog and removal state | `models-store.json` / `gui-models.json` |
+| Pi 认证与设置 / Pi authentication and settings | `auth.json` / `settings.json` |
+| 人设与快捷键 / Persona and shortcuts | `APPEND_SYSTEM.md` / `keybindings.json` |
+| Pi 会话、角色和记忆 / Pi sessions, roles and memory | `sessions/` / `gui-library/library.json` |
+| Skill、任务与用量记录 / Skills, task records and usage | `gui-skills/` / `gui-harness/` / `gui-usage/` |
 
-外观、草稿、工作区和会话展示状态保存在 WebView localStorage；自定义壁纸保存在 IndexedDB。<br>
-Appearance, drafts, workspaces, and session-presentation state use WebView localStorage; custom wallpapers use IndexedDB.
+外观、草稿和部分工作区状态保存在 WebView 本地存储；自定义壁纸等资源使用 IndexedDB。迁移或卸载前应备份需要保留的数据。<br>
+Appearance, drafts and some workspace state use WebView local storage; custom wallpaper resources use IndexedDB. Back up data you need before migration or removal.
 
-GUI 路径尚未全面适配 `PI_CODING_AGENT_DIR` 自定义数据目录重定向。<br>
-GUI paths do not yet fully support custom data-directory redirection through `PI_CODING_AGENT_DIR`.
+本地存储不等于离线推理。发送的代码、文件、角色和记忆可能进入所选模型服务；请勿把密钥、完整会话或敏感日志提交到公开仓库。配置文件不是加密保险库。<br>
+Local storage is not offline inference. Submitted code, files, roles and memory may reach your selected provider. Never commit credentials, full sessions or sensitive logs. Configuration files are not an encrypted vault.
 
-本地存储不等于本地推理；加入请求的角色、笔记和项目内容可能会发送给所选模型服务。<br>
-Local storage does not mean local inference; roles, notes, and project content included in requests may be sent to the selected model provider.
-
-不要提交认证文件、API Key、个人配置、完整会话或敏感日志；本地配置不是加密保险库，日志也不保证自动脱敏。<br>
-Do not commit authentication files, API keys, personal configuration, full sessions, or sensitive logs; local configuration is not an encrypted vault, and logs are not guaranteed to be redacted.
-
-启用角色不会授予额外权限，但角色文本会影响模型行为，因此启用前应先阅读。<br>
-Activating a role grants no additional permissions, but its text can influence model behavior, so review it before activation.
-
-工作台路径检查和桥接认证不是 Pi 工具的操作系统沙箱；插件和项目脚本仍需单独评估信任。<br>
-Workbench path checks and bridge authentication are not an OS sandbox for Pi tools; assess plugins and project scripts separately.
-
-更多设置与数据位置见 [使用指南](docs/USAGE.md)，安全建议见 [安全说明](SECURITY.md)。<br>
-See the [usage guide](docs/USAGE.md) for settings and data locations, and [Security](SECURITY.md) for security guidance.
+应用层权限、路径检查和桥接认证不是操作系统级沙箱。外部 Agent / Skill 文本不能成为系统指令或授权依据，下载不等于执行，启用前应审查。<br>
+Application permissions, path checks and bridge authentication are not an OS sandbox. External Agent / Skill text is not a system instruction or authorization; downloading is not execution. Review it before activation.
 
 ## 文档与贡献 / Documentation and contribution
 
-- [使用与配置 / Usage and configuration](docs/USAGE.md)
-- [工程架构 / Architecture](docs/ARCHITECTURE.md)
-- [开发与验证 / Development and verification](docs/DEVELOPMENT.md)
-- [Windows 运行时与源码交付 / Windows runtime and source delivery](scripts/WINDOWS-RUNTIME.md)
-- [安装盘检查记录 / Installer inspection record](docs/releases/v1.0.3/README.md)
-- [市场来源与兼容范围 / Market provenance and compatibility](市场来源与兼容范围.md)
-- [参与贡献 / Contributing](CONTRIBUTING.md)
-- [安全说明 / Security](SECURITY.md)
-- [第三方说明 / Third-party notices](THIRD_PARTY_NOTICES.md)
+- [开发与构建 / Development and build](BUILDING.md)
+- [Windows 运行资源 / Windows runtime packaging](scripts/WINDOWS-RUNTIME.md)
+- [公开仓库文档 / Repository documentation](https://github.com/nbang2026/Easy_pi/tree/main/docs)
+- [参与贡献 / Contributing](https://github.com/nbang2026/Easy_pi/blob/main/CONTRIBUTING.md)
+- [安全说明 / Security](https://github.com/nbang2026/Easy_pi/blob/main/SECURITY.md)
+- [第三方说明 / Third-party notices](https://github.com/nbang2026/Easy_pi/blob/main/THIRD_PARTY_NOTICES.md)
 
-欢迎通过 [GitHub Issues](https://github.com/nbang2026/Easy_pi/issues) 反馈问题或提交改进，并附上版本、操作系统、复现步骤和脱敏诊断。<br>
-Report issues or propose improvements through [GitHub Issues](https://github.com/nbang2026/Easy_pi/issues), including the version, operating system, reproduction steps, and redacted diagnostics.
+欢迎通过 [GitHub Issues](https://github.com/nbang2026/Easy_pi/issues) 反馈问题或建议。请附上版本、系统与架构、执行引擎、复现步骤和脱敏诊断；提交改进时说明改动范围和验证方式。<br>
+Report issues or propose improvements through [GitHub Issues](https://github.com/nbang2026/Easy_pi/issues), including version, OS/architecture, engine, reproduction steps and redacted diagnostics. Describe scope and verification when contributing changes.
 
 ## 许可与致谢 / License and acknowledgments
 
-项目采用 **[MIT License](LICENSE)**，允许在遵守许可条款的前提下使用、修改和再分发。<br>
-The project is licensed under the **[MIT License](LICENSE)** and may be used, modified, and redistributed subject to its terms.
+项目采用 **[MIT License](https://github.com/nbang2026/Easy_pi/blob/main/LICENSE)**。第三方组件、媒体和下载内容遵循各自许可，项目许可不替代这些条款。<br>
+The project uses the **[MIT License](https://github.com/nbang2026/Easy_pi/blob/main/LICENSE)**. Third-party components, media and downloaded content retain their own terms.
 
-第三方组件、资源和导入的 Agent 内容遵循各自许可；内置文本角色现有元数据标记为 **CC0-1.0**。<br>
-Third-party components, assets, and imported Agent content retain their respective licenses; existing built-in text-role metadata is marked **CC0-1.0**.
+感谢 [Pi Coding Agent](https://pi.dev)、[Tauri](https://tauri.app)、[xterm.js](https://xtermjs.org) 以及 Rust、TypeScript、Vite 和相关开源项目。<br>
+Thanks to [Pi Coding Agent](https://pi.dev), [Tauri](https://tauri.app), [xterm.js](https://xtermjs.org), and the Rust, TypeScript, Vite and related open-source ecosystems.
 
-感谢 [Pi Coding Agent](https://pi.dev)、[Tauri](https://tauri.app)、[xterm.js](https://xtermjs.org) 以及 Rust、TypeScript 和 Vite 生态。<br>
-Thanks to [Pi Coding Agent](https://pi.dev), [Tauri](https://tauri.app), [xterm.js](https://xtermjs.org), and the Rust, TypeScript, and Vite ecosystems.
-
-easy_pi 是基于 Pi 构建的独立项目，不代表 Pi 上游官方出品或背书。<br>
-easy_pi is an independent project built around Pi and is not an official Pi release or endorsement.
+easy_pi 是独立项目，不代表 Pi、Claude 或相关上游的官方出品或背书。<br>
+easy_pi is an independent project, not an official release or endorsement from Pi, Claude or related upstream projects.

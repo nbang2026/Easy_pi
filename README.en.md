@@ -1,263 +1,263 @@
 <div align="center">
   <img src="app-icon.png" width="96" alt="easy_pi application icon" />
   <h1>easy_pi</h1>
-  <p><strong>A desktop workspace for the Pi coding agent.</strong></p>
-  <p>Version 1.0.3 · Tauri v2 · Rust · TypeScript · Vite · xterm.js</p>
-  <p><strong><a href="https://github.com/nbang2026/Easy_pi/releases/download/v1.0.3/easy_pi-1.0.3-macOS-arm64.dmg">⬇ Direct download · macOS Apple Silicon (DMG)</a></strong></p>
-  <p><a href="README.md">简体中文</a> · <a href="https://github.com/nbang2026/Easy_pi/releases">All releases</a> · <a href="docs/USAGE.md">Usage (中文)</a> · <a href="docs/ARCHITECTURE.md">Architecture (中文)</a> · <a href="LICENSE">MIT License</a></p>
+  <p><strong>A more intuitive desktop workspace for Pi and Claude coding agents.</strong></p>
+  <p>Windows x64 · macOS Apple Silicon · Tauri v2 · Rust · TypeScript · Vite · xterm.js</p>
+  <p><strong><a href="https://github.com/nbang2026/Easy_pi/releases">Windows installers &amp; macOS apps</a></strong></p>
+  <p><a href="README.md">简体中文 / Bilingual README</a> · <a href="https://github.com/nbang2026/Easy_pi/releases">All releases</a> · <a href="BUILDING.md">Build guide (中文)</a> · <a href="https://github.com/nbang2026/Easy_pi/issues">Issues</a> · <a href="https://github.com/nbang2026/Easy_pi/blob/main/LICENSE">MIT License</a></p>
 </div>
 
 ---
 
 ## What is easy_pi?
 
-**easy_pi is an open-source desktop GUI and local workbench for [Pi Coding Agent](https://pi.dev).**
+**easy_pi is a desktop GUI and local workbench built around [Pi Coding Agent](https://pi.dev) and an independent Claude engine, available for Windows and macOS.**
 
-Pi is a terminal coding agent that uses models and local tools to explore code, modify projects, investigate problems and perform development tasks. easy_pi runs the real Pi CLI inside a native desktop window and adds model management, workspace files and Git review, session access, text Agents, local notes and appearance settings.
+It brings model connections, project sessions, files, Git review, Agent / Skill libraries, permission approvals, task records and usage analysis into a native desktop window. Use the graphical conversation and workbench or keep a compact terminal workflow. Wallpapers, fonts and sounds personalize the interface without merging engine or project boundaries.
 
-You can keep using Pi's terminal interaction and commands while managing connections, adding file references and switching task roles through graphical controls. **Pi and the configured model perform the tasks; easy_pi provides the desktop environment rather than a separate hosted model service.**
+**easy_pi provides a desktop harness, not hosted models or free credits.** Tasks are performed by the selected engine, your configured model and local tools.
 
 ### What can it do?
 
-- **Development:** work with project files on code exploration, implementation, debugging and tests.
-- **Review and project organization:** use code-review, architecture or release-checking roles to structure a task.
-- **Documentation and analysis:** reuse writing, data-analysis and planning workflows.
-- **Model connections:** maintain providers and model settings without relying only on manual JSON editing.
-- **Reusable context:** save role definitions, project notes and conventions for subsequent tasks.
-- **Local change review:** browse files, edit text, inspect Git diffs and stage or unstage files in one workspace.
+- **Development:** Explore code, implement features, debug issues and add tests with project context.
+- **Review projects:** Browse files, edit text, inspect Git diffs and review staging state.
+- **Organize agent work:** Manage roles and skills and coordinate constrained read-only child tasks where supported.
+- **Reuse context:** Save project notes, role definitions and conventions for later tasks.
+- **Control execution:** Review tool requests, approve permissions, configure budgets, stop tasks and inspect results.
+- **Understand usage:** Review model usage and known costs through trends, records and calendar heatmaps.
+
+### Responsibilities
+
+| easy_pi provides | Engines and environment provide |
+| --- | --- |
+| Desktop UI, composer, terminal display, workbench and project access | Pi / Claude execution, model requests, context processing and tools |
+| Connection settings, role/skill management, approvals and task records | Model services, API keys or engine-supported authentication |
+| Session access, local memory, usage views and environment checks | Git, project dependencies, SDKs and platform tools; some runtimes may be bundled |
 
 ## Download and install
 
 > [!IMPORTANT]
-> **Windows development notice**
+> **Windows and macOS**
 >
-> The Windows version is still in development; no exe/MSI installer has been released, and the current Windows source and runtime-preparation workflow is for development and verification only.
+> Windows installers now exist; Windows is no longer source-only. Select an actual platform asset from [Releases](https://github.com/nbang2026/Easy_pi/releases). Platform versions may differ.
 >
-> This section and [Releases](https://github.com/nbang2026/Easy_pi/releases) will be updated when the Windows version is released; stay tuned for announcements.
+> Building and uploading are separate steps. A new package absent from Releases is not publicly downloadable there. GitHub-generated source ZIPs and source-with-environment kits are not application installers.
+
+> [!WARNING]
+> **Publication check, October 31, 2026:** The supplied Windows PiRepair3 installer and source ZIP are truncated and excluded from this release. Windows assets are pending intact files and verification; the download entry does not imply a valid Windows asset is currently available.
+
+### Windows x64
+
+**[View Windows installation assets](https://github.com/nbang2026/Easy_pi/releases)**
+
+1. Download the release's `.exe` installer, or its `.msi` if provided.
+2. Verify provenance and the accompanying SHA-256, then install and launch easy_pi.
+3. Check the runtime in Settings, configure a model connection and select a project.
+
+The full Windows build configuration includes target-specific Node / Pi and Claude / DSH resources and carries WebView2 offline installation resources. Check the actual package notes for its contents and signing state; filenames or size alone are not evidence. Git / Git Bash, project-specific SDKs, accounts and model credits remain your responsibility.
 
 ### macOS Apple Silicon
 
-**[⬇ Download easy_pi-1.0.3-macOS-arm64.dmg directly](https://github.com/nbang2026/Easy_pi/releases/download/v1.0.3/easy_pi-1.0.3-macOS-arm64.dmg)**
+**[View macOS application assets](https://github.com/nbang2026/Easy_pi/releases)**
 
-For M-series Macs. [All releases](https://github.com/nbang2026/Easy_pi/releases) · [SHA-256 checksum](docs/releases/v1.0.3/SHA256SUMS) · [Installer inspection record](docs/releases/v1.0.3/README.md).
+1. Download an Apple Silicon / arm64 application ZIP, or a DMG if provided, and verify its SHA-256.
+2. Extract the ZIP or mount the DMG and move `easy_pi.app` into Applications.
+3. Check the local runtime and engine connection, configure a model and select a project.
 
-> The link requires the same-named DMG to be present in the v1.0.3 release. If it returns 404, check publication status. The application ZIP in the repository is a separate distribution file.
+Existing Mac Apps require external **Node.js 22.19+** and a working Pi CLI for Pi mode; the paired tested Pi core is **1.3.0**. Claude resources are prepared per build, while authentication and connectivity require your configuration.
 
-**Prepare external Node/Pi and a working model connection first.** The repository's pinned Windows runtime uses Pi **1.3.0**; Node **22.x, at least 22.19**, is recommended for the current development/test tooling. This is not a claim that every external Pi version has been tested. See [Pi](https://pi.dev) for installation and authentication instructions.
-
-```bash
-node --version
-pi --version
-
-# If Pi is not installed, use a compatible Node/npm environment:
-npm install -g @earendil-works/pi-coding-agent
-```
-
-1. Download the DMG and compare its SHA-256.
-2. Mount it and drag **`easy_pi.app`** to **Applications**, or extract and move the app from its ZIP.
-3. Launch the app and confirm the local Pi and GUI bridge connections.
-4. Configure a model, select a workspace and begin a task.
-
-The inspected DMG contains an arm64 application with version 1.0.3. Image integrity and local static signature verification passed; the app uses an **ad-hoc signature**. This does not establish Developer ID signing or Apple notarization, and application functionality was not exercised in this documentation task. No bundled Node/Pi was seen in the inspected Mac app. Verify provenance rather than disabling system protections.
+Existing Mac candidates are **ad-hoc signed, not Apple notarized**. Verify their source and follow system prompts without disabling security protections.
 
 ### Platform scope
 
-| Platform | Current distribution boundary |
+| Platform | Distribution boundary |
 | --- | --- |
-| macOS Apple Silicon / arm64 | DMG distribution file and repository app ZIP; external Node/Pi required; consult actual release assets |
-| Windows x64 | Source-kit and pinned-runtime preparation tooling; current wrapper does not create easy_pi exe/MSI installers; required offline input is not tracked in Git |
-| Intel macOS / Linux / mobile | Cross-platform code, schemas or icons do not establish verified release support |
+| Windows x64 | Application installers and source workflows; consult package notes for runtimes, signing and native validation |
+| macOS Apple Silicon / arm64 | Native App; Pi mode requires external Node/Pi; a separate source-with-environment kit is also available |
+| Other architectures and platforms | Cross-platform code does not establish a release or completed validation |
 
-**Local execution does not imply offline inference.** Model requests, GitHub previews and network tools may still contact external services.
+End active tasks, quit the previous version and keep necessary backups before upgrading. A Pi update notice is not an application auto-updater.
 
-## Features in 1.0.3
+## Features
 
-### Desktop terminal and graphical input
+### Conversations, terminal and input
 
-- A Tauri v2 native window starts the real Pi CLI through a PTY.
-- xterm.js provides terminal input, scrolling, resizing and optional WebGL rendering.
-- A graphical composer, command shortcuts and session entry points complement the original TUI.
-- Structured GUI actions call Pi's editor/context APIs rather than creating a second model session.
-- Regular and wallpaper layouts share the same terminal/process. Some commands still require Pi's terminal selectors.
+- Graphical conversation and workbench views for daily work, with compact terminal mode for native Pi interaction.
+- Tauri-managed Pi processes, PTYs and authenticated local bridging, with xterm.js terminal rendering.
+- File references, command suggestions, shortcuts, draft protection and IME submission guards.
+- Pi send, control and queue operations according to engine capabilities, not presented as universal actions across engines.
+
+### Pi, Claude and Auto
+
+Pi and Claude keep separate execution states and session boundaries. Auto selects one engine before submission; it is neither a third core nor a merged conversation. Thinking level and work role are separate settings. Available levels and tools depend on your selected model and engine.
 
 ### Model management
 
-Open **Settings → Models & connections** to add or edit custom models, including names, IDs, API protocols, endpoints and keys.
-
-The interface supports editing/removing catalog and custom entries, row checkboxes, selecting current search results, deleting selected entries, clearing the list and restoring removed models. Destructive list actions require confirmation.
-
-Saved API Keys are not echoed back. Leaving the key field empty during editing preserves the existing key; several models may share one provider key. Removing a model entry does not clear that provider's key or endpoint. Reload or restart Pi when prompted.
-
-This is connection/configuration management, not model-weight downloading, local inference hosting or proof that a provider connection works.
+Manage API endpoints, protocols, keys and models by provider, with search, selection and bulk operations. Saved keys are not echoed back, and leaving a key field empty preserves its value. Models may share provider settings. A listed model is not a verified connection or downloaded model weights.
 
 ### Agent Market
 
-Open **Settings → Agent Market** to browse eight text-role templates:
+Browse online catalogs, built-in selections and downloaded entries with search, categories, full-text previews and local role management.
 
-| Agent | Purpose |
-| --- | --- |
-| Code Reviewer | Review real changes and identify reproducible defects |
-| Bug Investigator | Reproduce issues, investigate causes and verify fixes |
-| Test Engineer | Design boundary, error and regression tests |
-| Technical Writer | Write documentation grounded in the implementation |
-| Architecture Mapper | Explain modules, dependencies and data flow |
-| Release Checker | Check versions, dependencies, artifacts and verification scope |
-| Data Analyst | Validate data and produce reviewable analysis |
-| Task Planner | Turn goals into deliverable, verifiable steps |
+**Preview, download and activation are separate decisions.** Downloading does not activate a role or overwrite local edits. Review external entries' provenance, tool requirements and licenses.
 
-Search, categories, installed filtering, full-text previews and public GitHub `.md`/`.txt` imports are available. **Preview, import and activation are separate decisions.** Import does not activate a role; duplicate imports preserve local edits, and the default Pi role can be restored.
+A role definition is not an independent process and grants no terminal or network access. A separate plugin-install action may fetch executable code and must not be confused with the text market.
 
-Agents are role/workflow definitions, not parallel processes. Only one role is globally active at a time. GitHub previews have source, size, timeout and text-validation limits. The market does not install MCP servers, themes, DSH plugins or executable code.
+### Skill store and library
 
-The separate plugin-import action invokes `pi install <source>` and can fetch executable third-party code; it does not inherit the text market's safeguards. See [Market provenance and compatibility](市场来源与兼容范围.md).
+Search and preview skills, inspect `SKILL.md` and supporting files, download locally, and manage activation, updates and removal. Downloading and execution are separate. Activation must still be confirmed by the engine's loaded state. Skills do not install system dependencies or create tools an engine does not have.
+
+### Scheduling, permissions and long tasks
+
+Organize roles and skills for a task and coordinate constrained read-only child tasks with dependencies, concurrency limits and cancellation. Role entries and executing child tasks are distinct; support depends on the engine.
+
+Execution controls configure application permissions and task budgets and retain checkpoints, interruption records and acceptance state. Stop, resubmit and error handling assist task lifecycle management, not a guarantee of uninterrupted execution.
+
+Unlimited mode removes only the application's budget, not approvals, system limits, context limits or provider quotas. A model ending its output is not user acceptance.
 
 ### Local library and memory
 
-Save, search, read and edit role definitions and project notes. The active role and a limited selection of recent notes can be included when subsequent tasks begin. Context injection has capacity/length limits: it is not unlimited memory or automatic retrieval of all historical content.
-
-Memory and autonomous text-Agent downloads are enabled by default and can be disabled. Model-facing library tools cannot activate roles or change those authorizations. This does not disable Pi's other file/command tools.
+Save, search, read and edit roles, project notes and conventions for subsequent tasks. Context injection is bounded, not unlimited memory or automatic retrieval of all history.
 
 ### Workspace files, Git and sessions
 
-- Select a local project, browse its tree and search file paths.
-- Read/edit existing UTF-8 text files; save operations check external modifications.
-- Add local file references to a draft by selection or drag and drop; dropping does not send the task immediately.
-- Review unstaged/staged diffs and branch comparisons, and stage/unstage individual files.
-- Read/resume Pi sessions, with search and local pin/archive presentation.
+- Switch projects, search and resume saved sessions, and preserve drafts separately.
+- Browse file trees, search paths and edit supported text files with external-change checks on save.
+- Add references by selecting or dropping files without immediately submitting a task.
+- Review staged, unstaged and branch diffs and stage or unstage individual files.
 
-The editor currently limits files to 512 KiB. Search matches paths, not full text. Git features require external Git and are not a complete commit/push/merge client. Parts of the current attachment/path UI assume POSIX-style paths, so Windows compatibility still needs work.
+Git features require local Git and do not replace a complete commit, push and merge client.
 
-### Appearance
+### Usage analysis and update notices
 
-Chinese/English strings, static wallpapers, video backgrounds, transparency effects, fonts, sounds and shortcuts are configurable. Layout changes reuse the same Pi workflow. Custom wallpapers and some preferences live in the local WebView data store.
+Review trends, model breakdowns, rankings, records, calendar heatmaps and exports. Color intensity reflects usage. Missing records and unknown pricing are not presented as a complete bill or zero cost.
+
+Pi core update notices inform you without silently upgrading, restarting the engine or interrupting active work.
+
+### Appearance and preferences
+
+Chinese/English UI, static and animated wallpapers, transparent input, night UI, custom font colors and sizes, font import, click/typing/scroll sounds, custom sound packs and shortcut settings.
 
 ## Develop and build
 
-Recommended baseline: Node 22.x (at least 22.19), pnpm 9, Rust/Cargo stable and platform-native prerequisites. macOS builds require Xcode Command Line Tools; full desktop integration requires working Pi.
+Use Node.js 22.19+, pnpm 9, Bun, Rust/Cargo and platform-native prerequisites: Xcode Command Line Tools on macOS, or MSVC C++ Build Tools and Windows SDK on Windows.
 
 ```bash
 git clone https://github.com/nbang2026/Easy_pi.git
 cd Easy_pi
 pnpm install --frozen-lockfile
+cd agent-runtime
+bun install --frozen-lockfile
+cd ..
 pnpm check
 pnpm test
+```
+
+If your source kit has an outer wrapper, enter its `pi-app` directory containing `package.json` before running project commands.
+
+### macOS
+
+Prepare external Node/Pi, stage the Claude resources and start the native development window:
+
+```bash
+node scripts/prepare-claude-runtime.mjs --platform darwin --arch arm64
 pnpm tauri dev
 ```
 
-`pnpm dev` only previews the frontend at `http://localhost:1420`; it does not provide the complete native Pi backend.
-
-Build a macOS application:
+Build the macOS App:
 
 ```bash
 pnpm tauri build --bundles app
 ```
 
-Default output: `src-tauri/target/release/bundle/macos/easy_pi.app`. This does not automatically bundle external Node/Pi or create a notarized DMG. `pnpm tauri build` uses platform/configuration-specific bundle targets.
+Default output: `src-tauri/target/release/bundle/macos/easy_pi.app`. This does not provide Developer ID signing, notarization or automatic external Node/Pi bundling.
+
+### Windows
+
+On Windows x64, use the installer build entry point:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/build-desktop-windows.ps1
+```
+
+Building requires `runtime-assets/windows-x64-offline.zip` matching pinned hashes; a fresh clone may not include it. Obtain the trusted matching input rather than weakening validation. The script stages Node/Pi and Claude resources and builds NSIS / MSI; obtaining WebView2 build resources may require network access.
+
+This is different from the `scripts/build-windows.ps1` source-export wrapper. See [Windows runtime packaging](scripts/WINDOWS-RUNTIME.md) and the [build guide](BUILDING.md) for details. The optional `-VerifyInstallers` step actually installs the candidate and should run only in a disposable Windows test account.
+
+### Verification
 
 ```bash
-# Frontend checks, tests and build
-pnpm check
-pnpm test
 pnpm build
-
-# Rust unit tests
 cargo test --manifest-path src-tauri/Cargo.toml --lib
-
-# Staged verification and report
 pnpm verify
 ```
 
-`pnpm build` is frontend-only. Real-Pi smoke tests are opt-in; frontend, Rust, integration and installer checks are distinct verification layers. See [Development and verification](docs/DEVELOPMENT.md).
-
-### Windows source kit
-
-The packaging path expects a pinned archive containing Node 22.22.2, npm, Pi 1.3.0 and production dependencies, not Git, project SDKs or personal configuration.
-
-**A fresh Git clone does not include `runtime-assets/windows-x64-offline.zip`.** The directory is gitignored, and the current manual workflow has no step to retrieve this input. Obtain the exact trusted archive and place it at that path before running:
-
-```bash
-pnpm install --frozen-lockfile
-node scripts/prepare-windows-runtime.mjs
-node scripts/prepare-windows-runtime.mjs --check
-pnpm check
-pnpm test
-node scripts/package-source.mjs --output=artifacts/easy_pi-Windows-Source.zip
-```
-
-A PowerShell wrapper is also available:
-
-```powershell
-powershell -File scripts/build-windows.ps1 -Output .\artifacts\easy_pi-Windows-Source.zip
-```
-
-These commands create a source ZIP, **not an easy_pi exe/MSI**. Native Windows, ConPTY, WebView2 and installation/uninstallation require separate verification. Do not weaken archive hashes to bypass errors. See [Windows runtime and source delivery](scripts/WINDOWS-RUNTIME.md).
+Frontend, Rust, real-engine integration, installer checks and target-system tests are distinct layers. `pnpm dev` is frontend-only, not a native Pi backend. Building locally does not publish a GitHub release or establish clean-machine and overnight model-task reliability.
 
 ## Architecture and project organization
 
 ```text
-TypeScript UI / xterm.js
-           │ Tauri IPC
-           ▼
-      Rust desktop backend
-      ├── PTY ─────────────────────→ real Pi CLI
-      ├── workspace / Git / models          │
-      └── authenticated local bridge ←──→ session Pi GUI extension
-                                            ├── input / state
-                                            ├── Agent library
-                                            └── local memory
+TypeScript UI / conversation / workbench / xterm.js
+                         |
+                     Tauri IPC
+                         |
+                Rust desktop backend
+                |-- Pi process / PTY / authenticated bridge
+                |      `-- Pi CLI + session GUI extension
+                |-- Independent Claude runtime / sidecar
+                `-- Files / Git / models / runtime checks
+
+Task routing / bounded child tasks / Agent & Skill libraries
+Permissions / checkpoints / local memory / usage records
 ```
 
-Terminal bytes and structured GUI control use separate channels. Pi remains the execution core.
+Pi and Claude keep independent runtime state, with automatic routing before submission. Terminal bytes and structured GUI control use separate channels.
 
 | Location | Responsibility |
 | --- | --- |
-| `src/main.ts`, `bridge.ts` | Application assembly, terminal lifecycle and native IPC |
-| `src/workbench.ts`, `model-*.ts` | Workspace/files/sessions/Git and model controls |
-| `src/agent-market.ts`, `library-settings.ts` | Text market and role/memory interfaces |
-| `src-tauri/src/lib.rs`, `runtime.rs` | Native commands, PTY, configuration and runtime lookup |
-| `src-tauri/src/gui_bridge.rs`, `gui-extension.ts` | Authenticated local transport and Pi integration |
-| `src-tauri/src/gui-library.mjs`, `gui-market.mjs` | Role/memory persistence, text import and built-in catalog |
-| `src-tauri/src/workbench.rs`, `model_management.rs` | File/Git operations and model updates |
-| `public/`, `scripts/`, `.github/workflows/` | Media, testing, runtime preparation and source delivery |
-
-See [Architecture](docs/ARCHITECTURE.md) for module boundaries, data flow and current limitations.
+| `src/main.ts`, `src/bridge.ts` | Frontend assembly, lifecycle and native IPC |
+| `src/conversation-view.ts`, `src/claude-view.ts`, `src/workbench.ts` | Conversation, Claude views and project workbench |
+| `src/model-*.ts`, `src/agent-market.ts`, `src/skill-library.ts` | Model, Agent and Skill interfaces |
+| `src-tauri/src/gui_bridge.rs`, `gui-extension.ts` | Authenticated Pi transport and session extension |
+| `src-tauri/src/claude_runtime.rs`, `agent-runtime/` | Independent Claude lifecycle and runtime resources |
+| `src-tauri/src/task-routing.mjs`, `task-scheduler.mjs` | Task routing and constrained child-task scheduling |
+| `src-tauri/src/gui-library.mjs`, `gui-skills.mjs`, `gui-usage.mjs`, `gui-harness.mjs` | Library, skills, usage and execution records |
+| `public/`, `scripts/`, `.github/workflows/` | Media, verification, runtime preparation and build workflows |
 
 ## Data and privacy
 
-The default directory used by GUI configuration is **`~/.pi/agent/`, not `~/.config/pi/`**. On Windows, USERPROFILE supplies HOME if it is missing.
+Pi and related GUI data default to **`~/.pi/agent/`**. `PI_CODING_AGENT_DIR` redirects the related data root, and Windows uses the corresponding user home. Claude maintains separate engine sessions and authentication settings.
 
-| Data | Location relative to `~/.pi/agent/` |
+| Data | Location relative to the Pi data directory |
 | --- | --- |
-| Custom providers/models, possibly API Keys | `models.json` |
-| Catalog and removed-model state | `models-store.json` / `gui-models.json` |
-| Authentication and Pi settings | `auth.json` / `settings.json` |
+| Custom models/providers, possibly keys | `models.json` |
+| Model catalog and removal state | `models-store.json` / `gui-models.json` |
+| Pi authentication and settings | `auth.json` / `settings.json` |
 | Persona and shortcuts | `APPEND_SYSTEM.md` / `keybindings.json` |
-| Sessions and roles/notes | `sessions/` / `gui-library/library.json` |
+| Pi sessions, roles and memory | `sessions/` / `gui-library/library.json` |
+| Skills, task records and usage | `gui-skills/` / `gui-harness/` / `gui-usage/` |
 
-Appearance, drafts, workspace and session presentation use WebView localStorage; custom wallpapers use IndexedDB. GUI paths are not comprehensively redirected by `PI_CODING_AGENT_DIR`.
+Appearance, drafts and some workspace state use WebView local storage; custom wallpaper resources use IndexedDB. Back up needed data before migration or removal.
 
-Local storage does not mean local-only inference: roles, notes and project content included in requests may be sent to the selected provider. Do not commit credentials, private profiles, full sessions or sensitive logs. Configuration is not an encrypted vault, and logs are not guaranteed to be redacted.
+Local storage is not offline inference. Submitted code, files, roles and memory may reach the selected provider. Never commit credentials, full sessions or sensitive logs. Configuration files are not an encrypted vault.
 
-Role activation does not grant extra permissions, but role text influences model behavior. Workspace path checks and bridge authentication are not an OS sandbox for Pi tools. This is a local desktop application, not a hosted multi-tenant platform or parallel-agent scheduler.
+Application permissions, path checks and bridge authentication are not an OS sandbox. External Agent / Skill text is not a system instruction or authorization. Downloading is not execution; review content before activation.
 
 ## Documentation and contribution
 
-Detailed guides are currently written in Chinese unless noted:
+- [Development and build (中文)](BUILDING.md)
+- [Windows runtime packaging](scripts/WINDOWS-RUNTIME.md)
+- [Repository documentation](https://github.com/nbang2026/Easy_pi/tree/main/docs)
+- [Contributing](https://github.com/nbang2026/Easy_pi/blob/main/CONTRIBUTING.md)
+- [Security](https://github.com/nbang2026/Easy_pi/blob/main/SECURITY.md)
+- [Third-party notices](https://github.com/nbang2026/Easy_pi/blob/main/THIRD_PARTY_NOTICES.md)
 
-- [Usage and configuration](docs/USAGE.md)
-- [Architecture](docs/ARCHITECTURE.md)
-- [Development and verification](docs/DEVELOPMENT.md)
-- [Windows runtime/source delivery (English)](scripts/WINDOWS-RUNTIME.md)
-- [Installer inspection record](docs/releases/v1.0.3/README.md)
-- [Market provenance](市场来源与兼容范围.md)
-- [Contributing](CONTRIBUTING.md)
-- [Security](SECURITY.md)
-- [Third-party notices](THIRD_PARTY_NOTICES.md)
-
-Documentation, tests and focused code improvements are welcome. Open an [Issue](https://github.com/nbang2026/Easy_pi/issues) with your version, OS/architecture, reproduction steps and redacted diagnostics.
+Open an [Issue](https://github.com/nbang2026/Easy_pi/issues) with the version, OS/architecture, engine, reproduction steps and redacted diagnostics. Documentation, tests and focused improvements are welcome; describe the scope and verification of each change.
 
 ## License and acknowledgments
 
-The application is licensed under the **[MIT License](LICENSE)**. Dependencies, media and imported definitions retain their own terms. Existing built-in text-role metadata is marked **CC0-1.0** and is not replaced by the application license.
+The project uses the **[MIT License](https://github.com/nbang2026/Easy_pi/blob/main/LICENSE)**. Third-party components, media and downloaded content retain their own terms.
 
-Thanks to [Pi Coding Agent](https://pi.dev), [Tauri](https://tauri.app), [xterm.js](https://xtermjs.org) and the Rust/TypeScript/Vite ecosystems. easy_pi is an independent project built around Pi, not a claim of official upstream affiliation or endorsement.
+Thanks to [Pi Coding Agent](https://pi.dev), [Tauri](https://tauri.app), [xterm.js](https://xtermjs.org) and the Rust, TypeScript, Vite and related open-source ecosystems.
+
+easy_pi is an independent project, not an official release or endorsement from Pi, Claude or related upstream projects.
