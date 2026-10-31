@@ -1,5 +1,6 @@
 import { PI_KEYBINDINGS } from "./keybindings-data.ts";
 import { icon } from "./icons.ts";
+import { formatUserError } from "./utils.ts";
 
 export const GUI_KEYBINDINGS = [
   { id: "gui.palette", def: "super+k", desc: "keybind.palette" },
@@ -18,6 +19,34 @@ const names: Record<string, string> = {
 const symbolKeys: Record<string, string> = {
   Backquote: "`", Minus: "-", Equal: "=", BracketLeft: "[", BracketRight: "]",
   Backslash: "\\", Semicolon: ";", Quote: "'", Comma: ",", Period: ".", Slash: "/",
+};
+
+const browserNavigator = () => {
+  if (typeof window !== "undefined" && window.navigator) return window.navigator;
+  return typeof navigator !== "undefined" ? navigator : undefined;
+};
+
+/** GUI "super" bindings use Ctrl on Windows and Command elsewhere. */
+export function isWindowsPlatform(): boolean {
+  const current = browserNavigator();
+  const platform = String(current?.platform || "");
+  const userAgent = String(current?.userAgent || "");
+  const userAgentData = String((current as Navigator & { userAgentData?: { platform?: string } } | undefined)?.userAgentData?.platform || "");
+  return /^(?:win32|win64|windows)$/i.test(platform)
+    || /^windows/i.test(userAgentData)
+    || /\bWindows(?:\s|\/|;|$)/i.test(userAgent);
+}
+
+const platformCombo = (value: string): string | null => {
+  const normalized = normalizeKeyCombo(value);
+  if (!normalized || !isWindowsPlatform()) return normalized;
+  return normalizeKeyCombo(normalized.split("+").map((part) => part === "super" ? "ctrl" : part).join("+"));
+};
+
+const canonicalGuiCombo = (value: string): string | null => {
+  const normalized = normalizeKeyCombo(value);
+  if (!normalized || !isWindowsPlatform()) return normalized;
+  return normalizeKeyCombo(normalized.split("+").map((part) => part === "ctrl" ? "super" : part).join("+"));
 };
 
 export function normalizeKeyCombo(value: unknown): string | null {
@@ -88,13 +117,21 @@ export function setupKeybindingSettings(options: {
     }
   } catch { /* Fall back to the native GUI defaults. */ }
   const bindings = [...GUI_KEYBINDINGS, ...PI_KEYBINDINGS];
+  const guiEventAllowed = (event: KeyboardEvent) => {
+    if (!isWindowsPlatform()) return true;
+    const target = event.target as Element | null;
+    // Windows maps GUI "super" bindings to Ctrl. Keep Pi's native Ctrl editing
+    // layer intact while the terminal or composer owns the event.
+    return !target?.closest?.("#terminal, textarea, input, [contenteditable='true']");
+  };
   const keys = (id: string) => {
     const value = (id.startsWith("gui.") ? gui : overrides)[id];
-    if (value !== undefined) return (Array.isArray(value) ? value : [value]).map(normalizeKeyCombo).filter(Boolean);
+    if (value !== undefined) return (Array.isArray(value) ? value : [value]).map((key) => id.startsWith("gui.") ? platformCombo(key) : normalizeKeyCombo(key)).filter(Boolean);
     const defaults = bindings.find((binding) => binding.id === id)?.def || "";
-    return defaults.split("(")[0].split(",").map((key) => normalizeKeyCombo(key.trim())).filter(Boolean);
+    return defaults.split("(")[0].split(",").map((key) => id.startsWith("gui.") ? platformCombo(key.trim()) : normalizeKeyCombo(key.trim())).filter(Boolean);
   };
   const matches = (id: string, event: KeyboardEvent) => {
+    if (id.startsWith("gui.") && !guiEventAllowed(event)) return false;
     const combo = keyEventCombo(event);
     return !!combo && keys(id).includes(combo);
   };
@@ -108,10 +145,24 @@ export function setupKeybindingSettings(options: {
     if (value) {
       if (id.startsWith("gui.") && !/ctrl|alt|super|f[0-9]+/.test(value)) { message("keybind.needsModifier"); return; }
       if (!id.startsWith("gui.") && /\+f[0-9]+$/.test(value)) { message("keybind.functionModifiers"); return; }
-      if (/^super\+(q|w|m|h|space|tab)$/.test(value)) { message("keybind.systemReserved"); return; }
-      const conflict = bindings.find((binding) => binding.id !== id
-        && (id.startsWith("gui.") || binding.id.startsWith("gui.")) && keys(binding.id).includes(value));
+      const canonical = id.startsWith("gui.") ? canonicalGuiCombo(value) : normalizeKeyCombo(value);
+      if (!canonical) return;
+      if (/^super\+(q|w|m|h|space|tab)$/.test(canonical)) { message("keybind.systemReserved"); return; }
+      const effective = id.startsWith("gui.") ? platformCombo(canonical) : canonical;
+      const conflict = bindings.find((binding) => {
+        if (binding.id === id || !keys(binding.id).includes(effective)) return false;
+        const currentIsGui = id.startsWith("gui.");
+        const otherIsGui = binding.id.startsWith("gui.");
+        // Native Pi bindings may share a key with one another, as they did
+        // before the GUI layer existed. On Windows the GUI Ctrl layer is
+        // scoped away from the terminal, so it may also reuse a Pi Ctrl key
+        // without stealing editor input.
+        if (!currentIsGui && !otherIsGui) return false;
+        if (currentIsGui && otherIsGui) return true;
+        return !isWindowsPlatform();
+      });
       if (conflict) { message("keybind.conflict", ` ${conflict.id}`); return; }
+      value = canonical;
     }
     saving = true; cancel(); render();
     try {
@@ -129,7 +180,7 @@ export function setupKeybindingSettings(options: {
           catch { message("keybind.savedPending"); }
         } else message("keybind.savedPending");
       }
-    } catch (error) { status.textContent = String(error); messageKey = ""; }
+    } catch (error) { status.textContent = formatUserError(error); messageKey = ""; }
     finally { saving = false; if (!disposed) render(); }
   };
   const reset = async (id: string) => {
@@ -147,7 +198,7 @@ export function setupKeybindingSettings(options: {
           catch { message("keybind.savedPending"); }
         } else message("keybind.savedPending");
       }
-    } catch (error) { status.textContent = String(error); messageKey = ""; }
+    } catch (error) { status.textContent = formatUserError(error); messageKey = ""; }
     finally { saving = false; if (!disposed) render(); }
   };
   const render = () => {
@@ -206,9 +257,17 @@ export function setupKeybindingSettings(options: {
     if (disposed) return;
     if (value && typeof value === "object" && !Array.isArray(value)) overrides = value;
     render();
-  }).catch((error) => { if (!disposed) status.textContent = String(error); })
+  }).catch((error) => { if (!disposed) status.textContent = formatUserError(error); })
     .finally(() => { loading = false; if (!disposed) render(); });
   return {
+    sequence: (id: string) => {
+      const combo = keys(id)[0];
+      if (!combo) return undefined;
+      const parts = combo.split("+"), key = parts.pop()!;
+      return terminalKeySequence({ key: key === "enter" ? "Enter" : key, code: "",
+        ctrlKey: parts.includes("ctrl"), metaKey: parts.includes("super"), altKey: parts.includes("alt"),
+        shiftKey: parts.includes("shift"), isComposing: false, keyCode: 0 } as KeyboardEvent);
+    },
     ready, matches,
     nativeMatches: (event: KeyboardEvent) => PI_KEYBINDINGS.some((binding) => matches(binding.id, event)),
     refreshLanguage() { render(); if (messageKey) message(messageKey); },

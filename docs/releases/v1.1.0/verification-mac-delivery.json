@@ -1,0 +1,72 @@
+{
+  "product": "easy_pi",
+  "version": "1.1.0",
+  "packagedDate": "2026-10-31",
+  "applicationBuildDate": "2026-10-28",
+  "platform": "macOS-arm64",
+  "checks": {
+    "dmgIntegrity": "passed",
+    "sourceAppVersionArchitectureSignature": "passed",
+    "stagedApplicationsShortcut": "passed-before-cleanup",
+    "mountedDiskVerification": "blocked-device-not-configured",
+    "sourceZipCrc": "passed",
+    "sourceZipSha256": "passed",
+    "readmeCopyConsistency": "passed",
+    "localDocumentLinks": "passed",
+    "existingWindowsFileSizesAndTimestamps": "unchanged"
+  },
+  "limitations": [
+    "Ad-hoc signed, not Apple notarized",
+    "Read-only DMG mounting unavailable in the current environment; mounted application acceptance not completed",
+    "Pi mode requires external Node/Pi",
+    "Existing verified App repackaged, not recompiled",
+    "No clean-machine install, full GUI acceptance or paid model request"
+  ],
+  "files": [
+    {
+      "name": "easy_pi-1.1.0-macOS-arm64-20261031.dmg",
+      "bytes": 313422767,
+      "sha256": "d54f8e68c16a23457d7b1574430ea9ffedebf9b8ab82ecd49509288b66f23b15"
+    },
+    {
+      "name": "easy_pi-1.1.0-macOS-Source-Environment-20261028184300.zip",
+      "bytes": 1034981766,
+      "sha256": "8767478a35a3f7dc0452c4fd09e8144f8403b5772b23e1c268eabc8469e13b5a"
+    },
+    {
+      "name": "README.md",
+      "bytes": 27051,
+      "sha256": "878952616d29a60262e9222eec8318e7521ebdaf75a8a0fbed4cd0776c940fc1"
+    },
+    {
+      "name": "README.en.md",
+      "bytes": 15555,
+      "sha256": "86d464a898b29be8400f9ebe253f538d6a6b4a240f2e4cad7f2e44bee2a8eb38"
+    },
+    {
+      "name": "BUILDING.md",
+      "bytes": 4988,
+      "sha256": "ea571adb11a37c0e23ef8edbb99cfbb6cf9aab6d79c4f3472a1fdee7f27ef9fb"
+    },
+    {
+      "name": "app-icon.png",
+      "bytes": 31190,
+      "sha256": "872601047ab15510c2178676556c640c56d12539b656468d4e065b4b70fa4b12"
+    },
+    {
+      "name": "scripts/WINDOWS-RUNTIME.md",
+      "bytes": 4452,
+      "sha256": "45abc37f3f3c3b4c1063964faec57599be1393f27f89c4be50e9253f910b3314"
+    },
+    {
+      "name": "verification-source-environment.json",
+      "bytes": 1175,
+      "sha256": "62da4b4631ba1732e723f64e2386aa53d5bc81cd6eb3d70a6ef1adef50939d2d"
+    },
+    {
+      "name": "Mac-交付说明-20261031.md",
+      "bytes": 1692,
+      "sha256": "03867975f9ff9cfe5be618baeb9985b0d1af682f26427e2e5fa27699a629c735"
+    }
+  ]
+}

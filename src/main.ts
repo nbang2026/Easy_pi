@@ -1,6 +1,8 @@
 import "@xterm/xterm/css/xterm.css";
 import "./style.css";
 import "./workbench.css";
+import "./claude-view.css";
+import "./conversation-view.css";
 import { Channel } from "@tauri-apps/api/core";
 import { invoke as bridgeInvoke, isDesktop } from "./bridge";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
@@ -9,20 +11,44 @@ import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { WebglAddon } from "@xterm/addon-webgl";
 import { icon, renderIcons } from "./icons";
+import { applyLocalizedControlLabels } from "./accessibility";
 import { UI_STRINGS } from "./ui-strings";
-import { clampNumber, isHttpUrl, normalizeSendMode, parseLanguagePack } from "./utils";
-import { normalizeWallpaperInk, wallpaperFontSize, wallpaperUiSize, wallpaperTheme } from "./wallpaper-appearance";
+import { clampNumber, formatUserError, isHttpUrl, parseLanguagePack } from "./utils";
+import { CUSTOM_FONT_FAMILY, DEFAULT_TERMINAL_FONT_FAMILY, isSupportedFontFile, MAX_CUSTOM_FONT_BYTES, normalizeHexColor, normalizeWallpaperInk, wallpaperFontSize, wallpaperUiSize, wallpaperTheme } from "./wallpaper-appearance";
 import { createOutputBatcher, createSizeReporter } from "./terminal-flow";
 import { createRendererController } from "./terminal-renderer";
+import { createPiRecovery } from "./pi-connection";
+import { setupThinkingControls } from "./thinking-controls";
 import { setupWorkbench } from "./workbench";
+import { setupSendModeControls } from "./send-mode-controls";
 import { setupSoundSettings } from "./sound-settings";
 import { DEFAULT_WALLPAPER_ID, presetInk, setupWallpaperPresets, wallpaperPreset, type WallpaperPreset } from "./wallpaper-presets";
-import { setupKeybindingSettings, terminalKeySequence } from "./keybinding-settings";
+import { isWindowsPlatform, setupKeybindingSettings, terminalKeySequence } from "./keybinding-settings";
 import { setupLibrarySettings } from "./library-settings";
+import { setupSkillLibrary } from "./skill-library";
+import "./skill-library.css";
 import { setupAgentMarket } from "./agent-market";
+import { setupHarnessSettings } from "./harness-settings";
+import { createPiPermissions, type ToolApproval } from "./pi-permissions";
+import { setupUsageSettings } from "./usage-settings";
+import "./harness.css";
 import { bindModelList, renderModelRows, type ModelInfo } from "./model-list";
-import { confirmModelRemoval, confirmModelBatch, editModelDialog, type ModelEditInfo } from "./model-dialog";
+import { confirmModelRemoval, confirmModelBatch, confirmPiRecovery, confirmSessionResume, editModelDialog, type ModelEditInfo } from "./model-dialog";
+import { RESUME_KEY, readResumeTargets, storeResumeTarget } from "./session-recovery";
+import { setupSystemSettings } from "./system-settings";
 import { setupModelBulk } from "./model-bulk";
+import { setupSettingsNavigation } from "./settings-navigation";
+import { setupAgentRuntime } from "./agent-runtime";
+import { setupAgentSessionStrip } from "./agent-session-strip";
+import { setupPersonaSettings } from "./persona-settings";
+import { setupConversationView, type ConversationEvent } from "./conversation-view";
+import { createConversationSync } from "./conversation-sync";
+import { listen } from "@tauri-apps/api/event";
+import { setupThemePreference } from "./theme";
+import "./theme.css";
+import { setupComposerParticles, normalizeComposerParticleEffect } from "./composer-particles";
+import { isPermissionError, setupPermissionDialog } from "./permission-dialog";
+import "./permission-dialog.css";
 
 /** Bottom-bar send mode: send (Enter), control (Enter/steer), queue (Alt+Enter follow-up). */
 let sendMode: "send" | "control" | "queue" = "send";
@@ -36,9 +62,9 @@ const I18N_BUILTIN: Record<string, Record<string, string>> = {
     "title.wallpaperToggle": "切换动态壁纸",
     "title.settings": "设置",
     "title.quickbar": "快捷指令",
-    "title.hideCode": "隐藏代码",
-    "title.showCode": "显示代码",
-    "title.thinking": "模型强度",
+    "title.hideCode": "返回对话视图",
+    "title.showCode": "切换到终端视图",
+    "title.thinking": "思考强度",
     "title.wallpaperOn": "关闭壁纸（保持全黑）",
     "title.wallpaperOff": "开启动态壁纸",
     "quickbar.title": "快捷指令",
@@ -71,7 +97,7 @@ const I18N_BUILTIN: Record<string, Record<string, string>> = {
     "settings.on": "开",
     "settings.off": "关",
     "settings.persona": "导入模型人设",
-    "settings.personaWarn": "⚠️ 人设会占用上下文，可能降低使用性能与指令遵循度，请谨慎导入。",
+    "settings.personaWarn": "修改会自动应用到 Pi 的下一条消息；导入后也会立即生效。内容会发送给当前模型并占用上下文。",
     "settings.personaPh": "在这里粘贴人设/系统提示词…",
     "settings.addModel": "添加模型",
     "settings.importPlugin": "导入插件",
@@ -106,18 +132,27 @@ const I18N_BUILTIN: Record<string, Record<string, string>> = {
     "ph.relayName": "供应商名（默认 relay）",
     "ph.relayBaseurl": "地址，如 https://api.xxx.com/v1",
     "ph.relayModels": "模型 ID，多个用逗号分隔",
-    "persona.saved": "已保存，执行 /reload 或重启 pi 后生效",
-    "persona.cleared": "已清除人设",
-    "persona.loaded": "已导入文件内容，记得点保存",
+    "persona.loading": "正在读取当前人设…",
+    "persona.importing": "正在读取人设文件…",
+    "persona.saving": "正在应用修改…",
+    "persona.unsaved": "有未保存的修改。",
+    "persona.saved": "已自动应用，Pi 从下一条消息开始使用。",
+    "persona.cleared": "已清除，Pi 从下一条消息起不再使用。",
+    "persona.loaded": "文件已导入并应用，Pi 从下一条消息开始使用。",
+    "persona.applyNow": "立即应用",
+    "persona.pending": "修改待自动应用；发送消息时也会先同步。",
+    "persona.tooLarge": "人设内容不能超过 48 KB。",
+    "persona.invalid": "人设内容包含不支持的空字符。",
+    "persona.failed": "无法读取或保存人设。",
     "lang.importFailed": "语言包导入失败",
   },
   en: {
     "title.wallpaperToggle": "Toggle wallpaper",
     "title.settings": "Settings",
     "title.quickbar": "Quick commands",
-    "title.hideCode": "Hide terminal",
-    "title.showCode": "Show terminal",
-    "title.thinking": "Model effort",
+    "title.hideCode": "Return to conversation view",
+    "title.showCode": "Switch to terminal view",
+    "title.thinking": "Thinking effort",
     "title.wallpaperOn": "Turn off wallpaper (keep black)",
     "title.wallpaperOff": "Turn on live wallpaper",
     "quickbar.title": "Quick Commands",
@@ -150,7 +185,7 @@ const I18N_BUILTIN: Record<string, Record<string, string>> = {
     "settings.on": "On",
     "settings.off": "Off",
     "settings.persona": "Import model persona",
-    "settings.personaWarn": "⚠️ Personas consume context and can reduce performance and instruction-following. Import with care.",
+    "settings.personaWarn": "Changes are automatically applied to the next Pi message; imported files take effect immediately. The content is sent to the selected model and uses context.",
     "settings.personaPh": "Paste the persona / system prompt here…",
     "settings.addModel": "Add model",
     "settings.importPlugin": "Import plugin",
@@ -185,9 +220,18 @@ const I18N_BUILTIN: Record<string, Record<string, string>> = {
     "ph.relayName": "Provider name (default relay)",
     "ph.relayBaseurl": "URL, e.g. https://api.xxx.com/v1",
     "ph.relayModels": "Model IDs, comma separated",
-    "persona.saved": "Saved. Run /reload or restart pi to apply.",
-    "persona.cleared": "Persona cleared",
-    "persona.loaded": "File loaded, remember to save",
+    "persona.loading": "Loading current persona…",
+    "persona.importing": "Reading persona file…",
+    "persona.saving": "Applying changes…",
+    "persona.unsaved": "Unsaved changes.",
+    "persona.saved": "Applied automatically. Pi will use it from the next message.",
+    "persona.cleared": "Cleared. Pi will stop using it from the next message.",
+    "persona.loaded": "File imported and applied. Pi will use it from the next message.",
+    "persona.applyNow": "Apply now",
+    "persona.pending": "Changes will auto-apply; sending also syncs them first.",
+    "persona.tooLarge": "Persona content must be 48 KB or smaller.",
+    "persona.invalid": "Persona content contains an unsupported null character.",
+    "persona.failed": "Could not read or save the persona.",
     "lang.importFailed": "Failed to import language pack",
   },
 };
@@ -226,6 +270,10 @@ const langStrings = (lang: string): Record<string, string> => ({
 const t = (key: string): string => langStrings(currentLang)[key] ?? I18N_BUILTIN.zh[key] ?? key;
 
 async function main() {
+  const themeSelect = document.getElementById("theme-select") as HTMLSelectElement;
+  const theme = setupThemePreference(document.documentElement);
+  themeSelect.value = theme.preference;
+  themeSelect.addEventListener("change", () => theme.setPreference(themeSelect.value));
   renderIcons();
   const toastEl = document.getElementById("toast")!;
   let toastTimer: ReturnType<typeof setTimeout> | undefined;
@@ -235,24 +283,68 @@ async function main() {
     clearTimeout(toastTimer);
     toastTimer = setTimeout(() => toastEl.classList.remove("show"), ms);
   };
+  const permissionDialog = setupPermissionDialog({ language: () => currentLang, allowAll: async () => {
+    if (!harnessSettings) throw Error(currentLang === "en" ? "Permissions are not ready." : "权限设置尚未就绪。");
+    await harnessSettings.allowAll("pi");
+    showToast(currentLang === "en" ? "Full access is active for this engine." : "当前引擎的完全访问已生效。");
+  } });
+  const piPermissions = createPiPermissions({
+    request: value => permissionDialog.request(value), language: () => currentLang, notice: showToast,
+    answer: value => bridgeInvoke("gui_action", { action: "approval", text: JSON.stringify(value) }),
+  });
   let sounds: ReturnType<typeof setupSoundSettings> | undefined;
   let connected = false;
   let connecting = false;
   let workbench: ReturnType<typeof setupWorkbench> | undefined;
   let keybinds: ReturnType<typeof setupKeybindingSettings> | undefined;
   let librarySettings: ReturnType<typeof setupLibrarySettings> | undefined;
+  let piRecovery: ReturnType<typeof createPiRecovery> | undefined;
+  let thinkingControls: ReturnType<typeof setupThinkingControls> | undefined;
+  let skillLibrary: ReturnType<typeof setupSkillLibrary> | undefined;
   let agentMarket: ReturnType<typeof setupAgentMarket> | undefined;
-  const invoke = <T = void>(command: string, args?: Record<string, unknown>): Promise<T> => {
-    const result = command === "write_terminal" && !connected
-      ? Promise.reject(new Error(t(isDesktop ? "ui.disconnected" : "ui.previewOnly")))
-      : bridgeInvoke<T>(command, args);
-    return result.catch((error) => {
-      if (command === "write_terminal") showToast(String(error), 4500);
+  let harnessSettings: ReturnType<typeof setupHarnessSettings> | undefined;
+  let usageSettings: ReturnType<typeof setupUsageSettings> | undefined;
+  let systemSettings: ReturnType<typeof setupSystemSettings> | undefined;
+  let agentRuntime: ReturnType<typeof setupAgentRuntime> | undefined;
+  let conversationView: ReturnType<typeof setupConversationView> | undefined;
+  let composerParticles: ReturnType<typeof setupComposerParticles> | undefined;
+  let nextStepEnabled = false;
+  let answerOutlineEnabled = true;
+  let personaSettings: ReturnType<typeof setupPersonaSettings> | undefined;
+  const agentSessionStrip = setupAgentSessionStrip({
+    root: document.getElementById("agent-session-strip")!,
+    language: () => currentLang,
+    onSelect: (id) => {
+      if (id === "main") workbench?.focusInput();
+      else workbench?.selectAgent(id);
+    },
+  });
+  const invoke = async <T = void>(command: string, args?: Record<string, unknown>, retried = false): Promise<T> => {
+    try {
+      const routed = agentRuntime && ["gui_action", "gui_status", "list_sessions", "run_diagnostics"].includes(command)
+        ? await agentRuntime.route<T>(command, args)
+        : undefined;
+      if (routed !== undefined) return routed;
+      return await (command === "write_terminal" && !connected
+        ? Promise.reject(new Error(t(isDesktop ? "ui.disconnected" : "ui.previewOnly")))
+        : bridgeInvoke<T>(command, args));
+    } catch (error) {
+      if (isDesktop && !retried && isPermissionError(error)) {
+        const operation = typeof args?.action === "string" ? args.action : command;
+        const allowed = await permissionDialog.request({
+          title: t("ui.permissionRequired"),
+          operation,
+          detail: formatUserError(error),
+          risk: /(?:delete|remove|write|edit|shell|command|download|install|network|export)/i.test(operation) ? "high" : "medium",
+        });
+        if (allowed) return invoke<T>(command, args, true);
+      }
+      if (command === "write_terminal") showToast(formatUserError(error), 4500);
       throw error;
-    });
+    }
   };
   const term = new Terminal({
-    fontFamily: '"SFMono-Regular", Menlo, Monaco, "PingFang SC", "Microsoft YaHei", monospace',
+    fontFamily: DEFAULT_TERMINAL_FONT_FAMILY,
     fontSize: 14,
     fontWeight: "400",
     fontWeightBold: "700",
@@ -287,6 +379,65 @@ async function main() {
   fitAddon.fit();
   const workbenchTheme = { ...term.options.theme };
   let outputBatcher = createOutputBatcher((bytes, done) => term.write(bytes, done));
+  const conversationListeners: (() => void)[] = [];
+  const conversationInput = (prompt: string) => {
+    const input = document.getElementById("composer-input") as HTMLTextAreaElement | null;
+    const send = document.getElementById("composer-send") as HTMLButtonElement | null;
+    if (!input || !send) return;
+    if (document.getElementById("composer-attachments")?.childElementCount) {
+      showToast(currentLang === "en"
+        ? "Send or remove pending attachments before using answer actions."
+        : "请先发送或移除待发送附件，再使用回答快捷操作。");
+      return;
+    }
+    const draft = input.value;
+    const updateDraft = (value: string) => {
+      input.value = value;
+      input.dataset.particleSuppressed = "true";
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+      delete input.dataset.particleSuppressed;
+    };
+    updateDraft(prompt);
+    if (!send.disabled) send.click();
+    updateDraft(draft);
+  };
+  conversationView = setupConversationView({
+    root: document.getElementById("conversation-view")!,
+    onContinue: () => conversationInput("请继续完成上一个任务，并从上次停下的位置继续。"),
+    onRegenerate: () => conversationInput("请重新生成上一条回答，保持原任务目标不变。"),
+    nextStepEnabled: () => nextStepEnabled,
+    outlineEnabled: () => answerOutlineEnabled,
+    onNextStep: () => conversationInput(currentLang === "en"
+      ? "Based on your previous answer, suggest the single most useful next step and briefly explain why. Do not repeat the answer."
+      : "基于你上一条回答，只提出一个最值得执行的下一步建议，并简要说明理由。不要重复原回答。"),
+    onOutline: () => conversationInput(currentLang === "en"
+      ? "Turn your previous answer into a clear, hierarchical outline. Preserve its key conclusions and steps without adding unrelated content."
+      : "请把你上一条回答整理成清晰的分级大纲，保留关键结论和步骤，不添加无关内容。"),
+    onNotice: showToast,
+  });
+  const conversationSync = createConversationSync({
+    load: async () => {
+      const value = await bridgeInvoke<{ data: { sessionId: string; messages: ConversationEvent[]; truncated?: boolean } }>("gui_action", { action: "history" });
+      return value.data;
+    },
+    clear: () => conversationView?.clear(),
+    restore: (messages) => conversationView?.restore(messages),
+    consume: (event) => conversationView?.consume(event),
+    notice: showToast,
+  });
+  if (isDesktop) {
+    void listen<ToolApproval>("pi-gui-permission", event => {
+      if ((agentRuntime?.engine() || "pi") === "pi") piPermissions.receive(event.payload);
+    }).then(unlisten => conversationListeners.push(unlisten)).catch(() => {
+      showToast(currentLang === "en" ? "Permission event connection failed; reconnect before running tools." : "权限通知连接失败，请重连后再运行工具。", 6000);
+    });
+    void listen<ConversationEvent & { bridgeId?: string }>("pi-gui-message", (event) => {
+      if (agentRuntime?.engine() !== "pi") return;
+      const activeBridge = workbench?.runtimeId?.() || "";
+      if (activeBridge && event.payload.bridgeId && event.payload.bridgeId !== activeBridge) return;
+      conversationSync.consume({ ...event.payload, type: "message" });
+    }).then((unlisten) => conversationListeners.push(unlisten)).catch(() => {});
+  }
 
   let lastEscAt = 0;
   term.onData((data) => {
@@ -302,8 +453,13 @@ async function main() {
       }
       return;
     }
-    // 排队任务模式：把回车改为 Alt+Enter（pi 的 follow-up，等当前任务做完再执行）
-    const out = data === "\r" && sendMode === "queue" ? "\x1b[13;3u" : data;
+    // 排队任务模式沿用用户配置的 Pi follow-up 快捷键。
+    let out = data;
+    if (data === "\r" && sendMode === "queue") {
+      const sequence = keybinds?.sequence("app.message.followUp");
+      if (!sequence) { showToast(currentLang === "en" ? "Configure a queue shortcut first." : "请先在快捷键设置中启用排队快捷键。", 4000); return; }
+      out = sequence;
+    }
     invoke("write_terminal", { data: out }).catch(() => {});
   });
 
@@ -334,13 +490,12 @@ async function main() {
   const initialFitTimers = [setTimeout(sendResize, 300), setTimeout(sendResize, 1000)];
   sendResize();
 
-  // 点击任意位置都把键盘焦点收回终端（pi 的对话框支持鼠标点击选择）
+  // 原始终端只有在终端视图中接收键盘焦点。
   document.getElementById("terminal")!.addEventListener("mousedown", () => {
     // 注意：这里不取消快捷指令高亮，否则在浮层里点一下就会丢掉状态，
     // 再点快捷按钮就无法正确"回首页"了。
-    setTimeout(() => term.focus(), 0);
+    setTimeout(focusTerminal, 0);
   });
-  term.focus();
 
   // —— 右上角：壁纸快捷开关 + 设置面板（壁纸 / 字体大小）——
   const wallpaperToggle = document.getElementById("wallpaper-toggle") as HTMLButtonElement;
@@ -363,11 +518,49 @@ async function main() {
     }
   };
 
+  const particleSelect = document.getElementById("composer-particle-effect") as HTMLSelectElement;
+  const particleEffect = normalizeComposerParticleEffect(readStored("pi.composerParticleEffect") || "rainbow");
+  particleSelect.value = particleEffect;
+  composerParticles = setupComposerParticles({
+    input: document.getElementById("composer-input") as HTMLTextAreaElement,
+    host: document.getElementById("composer-input-wrap")!,
+    initialEffect: particleEffect,
+  });
+  particleSelect.addEventListener("change", () => {
+    const effect = normalizeComposerParticleEffect(particleSelect.value);
+    particleSelect.value = effect;
+    writeStored("pi.composerParticleEffect", effect);
+    composerParticles?.setEffect(effect);
+  });
+
+  const nextStepSwitch = document.getElementById("conversation-next-step-switch") as HTMLInputElement;
+  const outlineSwitch = document.getElementById("conversation-outline-switch") as HTMLInputElement;
+  nextStepEnabled = readStored("pi.conversationNextStep") === "1";
+  answerOutlineEnabled = readStored("pi.conversationOutline") !== "0";
+  nextStepSwitch.checked = nextStepEnabled;
+  outlineSwitch.checked = answerOutlineEnabled;
+  nextStepSwitch.addEventListener("change", () => {
+    nextStepEnabled = nextStepSwitch.checked;
+    writeStored("pi.conversationNextStep", nextStepEnabled ? "1" : "0");
+    conversationView?.refreshQuickActions();
+  });
+  outlineSwitch.addEventListener("change", () => {
+    answerOutlineEnabled = outlineSwitch.checked;
+    writeStored("pi.conversationOutline", answerOutlineEnabled ? "1" : "0");
+    conversationView?.refreshQuickActions();
+  });
+  conversationView.refreshQuickActions();
+
   let wallpaperOn = readStored("pi.wallpaper") === "on";
   let fontSize = clampNumber(readStored("pi.fontSize"), 10, 28, 14);
   let wallpaperFont = wallpaperFontSize(readStored("pi.wallpaperFontSize"));
   let wallpaperUiFont = wallpaperUiSize(readStored("pi.wallpaperUiFontSize"));
   let wallpaperInk = normalizeWallpaperInk(readStored("pi.wallpaperInk"));
+  let terminalFontColor = normalizeHexColor(readStored("pi.terminalFontColor"));
+  let customFontFace: FontFace | null = null;
+  let customFontName = "";
+  let fontOperation = 0;
+  let fontBusy = false;
   const wallpaperDensity = document.getElementById("wallpaper-density") as HTMLSelectElement;
   wallpaperDensity.value = readStored("pi.wallpaperDensity") === "compact" ? "compact" : "comfortable";
   const rendererSwitch = document.getElementById("renderer-switch") as HTMLInputElement;
@@ -413,11 +606,14 @@ async function main() {
   const wallpaperSwitch = document.getElementById("wallpaper-switch") as HTMLInputElement;
   const escSwitch = document.getElementById("esc-switch") as HTMLInputElement;
   const focusTerminal = () => {
-    if (settingsPanel.hidden && !document.body.classList.contains("hide-terminal")) term.focus();
+    if (!settingsPanel.hidden) return;
+    if (document.body.classList.contains("terminal-view")) term.focus();
+    else (document.getElementById("composer-input") as HTMLTextAreaElement | null)?.focus();
   };
   let onWorkspaceLayoutChange: (() => void) | null = null;
 
   const fullscreenToggle = document.getElementById("fullscreen-toggle") as HTMLButtonElement;
+  const workFullscreenToggle = document.getElementById("work-fullscreen-toggle") as HTMLButtonElement;
   const frameToggle = document.getElementById("frame-toggle") as HTMLButtonElement;
   const nativeWindow = isDesktop ? getCurrentWindow() : null;
   let fullscreen = false;
@@ -427,6 +623,10 @@ async function main() {
     fullscreenToggle.title = t(fullscreen ? "ui.exitFullscreen" : "ui.enterFullscreen");
     fullscreenToggle.setAttribute("aria-label", fullscreenToggle.title);
     fullscreenToggle.setAttribute("aria-pressed", String(fullscreen));
+    workFullscreenToggle.replaceChildren(icon(fullscreen ? "minimize" : "maximize"));
+    workFullscreenToggle.title = fullscreenToggle.title;
+    workFullscreenToggle.setAttribute("aria-label", fullscreenToggle.title);
+    workFullscreenToggle.setAttribute("aria-pressed", String(fullscreen));
     const hidden = document.body.classList.contains("frame-hidden");
     frameToggle.replaceChildren(icon(hidden ? "panel-top-open" : "panel-top-close"));
     frameToggle.title = t(hidden ? "ui.showFrame" : "ui.hideFrame");
@@ -452,9 +652,10 @@ async function main() {
       else await document.documentElement.requestFullscreen();
       await syncFullscreen();
       scheduleResize();
-    } catch (error) { showToast(`${t("ui.fullscreenFailed")}: ${String(error)}`, 4500); }
+    } catch (error) { showToast(`${t("ui.fullscreenFailed")}: ${formatUserError(error)}`, 4500); }
     finally { fullscreenToggle.disabled = false; focusTerminal(); }
   });
+  workFullscreenToggle.addEventListener("click", () => fullscreenToggle.click());
   const applyFrameHidden = async (hidden: boolean, persist = true) => {
     document.body.classList.toggle("frame-hidden", hidden);
     document.body.classList.remove("sidebar-open");
@@ -464,7 +665,7 @@ async function main() {
     if (persist) writeStored("pi.frameHidden", hidden ? "1" : "0");
     if (nativeWindow) {
       try { await nativeWindow.setDecorations(!hidden); }
-      catch (error) { showToast(`${t("ui.frameFailed")}: ${String(error)}`, 4500); }
+      catch (error) { showToast(`${t("ui.frameFailed")}: ${formatUserError(error)}`, 4500); }
     }
   };
   frameToggle.addEventListener("click", async () => {
@@ -489,6 +690,14 @@ async function main() {
     document.querySelectorAll<HTMLButtonElement>("[data-ink]").forEach((button) => {
       button.setAttribute("aria-pressed", String(button.dataset.ink === wallpaperInk));
     });
+    const defaultColor = wallpaperOn ? (wallpaperInk === "light" ? "#ffffff" : "#172421") : "#dbe0e4";
+    const colorInput = document.getElementById("terminal-font-color") as HTMLInputElement;
+    colorInput.value = terminalFontColor || defaultColor;
+    document.getElementById("terminal-font-color-value")!.textContent = terminalFontColor || t("settings.defaultFontColor");
+    (document.getElementById("terminal-font-color-reset") as HTMLButtonElement).disabled = !terminalFontColor;
+    document.getElementById("custom-font-name")!.textContent = customFontName || t("settings.defaultFont");
+    (document.getElementById("custom-font-import") as HTMLButtonElement).disabled = fontBusy;
+    (document.getElementById("custom-font-reset") as HTMLButtonElement).disabled = fontBusy || !customFontFace;
     settingsPanel.querySelectorAll<HTMLButtonElement>("button[data-setting]").forEach((btn) => {
       const active =
         (btn.dataset.setting === "wallpaper" && btn.dataset.value === (wallpaperOn ? "on" : "off")) ||
@@ -500,15 +709,38 @@ async function main() {
 
   const applyTerminalTypography = () => {
     document.body.dataset.wallpaperInk = wallpaperInk;
+    document.body.style.setProperty("--conversation-font-size", `${wallpaperOn ? wallpaperFont : fontSize}px`);
+    if (terminalFontColor) document.body.style.setProperty("--conversation-custom-color", terminalFontColor);
+    else document.body.style.removeProperty("--conversation-custom-color");
+    const wallpaperBase = wallpaperTheme(wallpaperInk, workbenchTheme, terminalFontColor);
+    const theme = wallpaperOn
+      ? wallpaperBase
+      : terminalFontColor
+        ? { ...workbenchTheme, foreground: terminalFontColor, brightWhite: terminalFontColor }
+        : workbenchTheme;
     term.options = {
-      theme: wallpaperOn ? wallpaperTheme(wallpaperInk, workbenchTheme) : workbenchTheme,
-      minimumContrastRatio: wallpaperOn ? 7 : 1,
+      theme,
+      fontFamily: customFontFace ? `"${CUSTOM_FONT_FAMILY}", ${DEFAULT_TERMINAL_FONT_FAMILY}` : DEFAULT_TERMINAL_FONT_FAMILY,
+      minimumContrastRatio: wallpaperOn && !terminalFontColor ? 7 : 1,
       fontSize: wallpaperOn ? wallpaperFont : fontSize,
       fontWeight: wallpaperOn ? "500" : "400",
       lineHeight: wallpaperOn ? 1.15 : 1,
     };
     scheduleResize();
   };
+  const terminalFontColorInput = document.getElementById("terminal-font-color") as HTMLInputElement;
+  terminalFontColorInput.addEventListener("input", () => {
+    terminalFontColor = normalizeHexColor(terminalFontColorInput.value);
+    if (terminalFontColor) writeStored("pi.terminalFontColor", terminalFontColor);
+    applyTerminalTypography();
+    refreshSettingsUI();
+  });
+  document.getElementById("terminal-font-color-reset")!.addEventListener("click", () => {
+    terminalFontColor = null;
+    try { localStorage.removeItem("pi.terminalFontColor"); } catch { /* Storage may be unavailable. */ }
+    applyTerminalTypography();
+    refreshSettingsUI();
+  });
   document.getElementById("wallpaper-ink")!.addEventListener("click", (event) => {
     const button = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-ink]");
     if (!button) return;
@@ -596,6 +828,154 @@ async function main() {
     storageQueue = result.then(() => {}, () => {});
     return result;
   };
+
+  let assistantIconUrl = "";
+  const assistantIconFile = document.getElementById("assistant-icon-file") as HTMLInputElement;
+  const assistantIconImport = document.getElementById("assistant-icon-import") as HTMLButtonElement;
+  const assistantIconReset = document.getElementById("assistant-icon-reset") as HTMLButtonElement;
+  const applyAssistantIcon = (url: string) => {
+    if (!url) return;
+    if (assistantIconUrl && assistantIconUrl.startsWith("blob:")) URL.revokeObjectURL(assistantIconUrl);
+    assistantIconUrl = url;
+    conversationView?.setAssistantIcon(url);
+    assistantIconReset.disabled = false;
+  };
+  assistantIconImport.addEventListener("click", () => assistantIconFile.click());
+  assistantIconFile.addEventListener("change", () => {
+    const file = assistantIconFile.files?.[0];
+    assistantIconFile.value = "";
+    if (!file) return;
+    if (!file.type.startsWith("image/") || file.size > 2 * 1024 * 1024) {
+      showToast("图标必须是图片且不能超过 2 MB。", 4000);
+      return;
+    }
+    void storeWallpaper(async () => {
+      const image = await createImageBitmap(file);
+      if (image.width < 16 || image.height < 16 || image.width > 2048 || image.height > 2048) {
+        image.close(); throw new Error("图标尺寸需在 16×16 到 2048×2048 之间。");
+      }
+      image.close();
+      await idbPut("assistant-icon", file);
+      writeStored("pi.assistantIconName", file.name.slice(0, 80));
+      applyAssistantIcon(URL.createObjectURL(file));
+      showToast("模型图标已更新。");
+    }).catch(error => showToast(formatUserError(error), 4500));
+  });
+  assistantIconReset.addEventListener("click", () => {
+    void storeWallpaper(async () => {
+      await idbDelete("assistant-icon");
+      try { localStorage.removeItem("pi.assistantIconName"); } catch {}
+      if (assistantIconUrl?.startsWith("blob:")) URL.revokeObjectURL(assistantIconUrl);
+      assistantIconUrl = "";
+      conversationView?.setAssistantIcon("/app-icon.png");
+      assistantIconReset.disabled = true;
+      showToast("已恢复默认模型图标。");
+    }).catch(error => showToast(formatUserError(error), 4500));
+  });
+  void idbGet("assistant-icon").then(blob => {
+    if (blob) { applyAssistantIcon(URL.createObjectURL(blob)); }
+    else assistantIconReset.disabled = true;
+  }).catch(() => { assistantIconReset.disabled = true; });
+
+  const fontFileInput = document.getElementById("custom-font-file") as HTMLInputElement;
+  const prepareFontFace = async (blob: Blob, name: string) => {
+    const header = new Uint8Array(await blob.slice(0, 4).arrayBuffer());
+    if (!isSupportedFontFile(name, blob.size, header)) throw new Error("Unsupported font file");
+    return new FontFace(CUSTOM_FONT_FAMILY, await blob.arrayBuffer()).load();
+  };
+  const applyImportedFont = (face: FontFace, name: string) => {
+    if (customFontFace) document.fonts.delete(customFontFace);
+    customFontFace = face;
+    customFontName = name;
+    document.fonts.add(face);
+    document.body.style.setProperty("--app-font-family", `"${CUSTOM_FONT_FAMILY}", -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif`);
+    applyTerminalTypography();
+    refreshSettingsUI();
+  };
+  const removeImportedFont = () => {
+    if (customFontFace) document.fonts.delete(customFontFace);
+    customFontFace = null;
+    customFontName = "";
+    document.body.style.removeProperty("--app-font-family");
+    try { localStorage.removeItem("pi.customFontName"); } catch { /* Storage may be unavailable. */ }
+    applyTerminalTypography();
+    refreshSettingsUI();
+  };
+  document.getElementById("custom-font-import")!.addEventListener("click", () => fontFileInput.click());
+  fontFileInput.addEventListener("change", async () => {
+    const file = fontFileInput.files?.[0];
+    fontFileInput.value = "";
+    if (!file) return;
+    const operation = ++fontOperation;
+    fontBusy = true;
+    refreshSettingsUI();
+    try {
+      if (file.size > MAX_CUSTOM_FONT_BYTES) {
+        showToast(t("settings.fontImportTooLarge"));
+        return;
+      }
+      let face: FontFace;
+      try {
+        face = await prepareFontFace(file, file.name);
+      } catch {
+        showToast(t("settings.fontImportInvalid"), 4500);
+        return;
+      }
+      try {
+        await storeWallpaper(() => idbPut("custom-font", file));
+      } catch {
+        document.fonts.delete(face);
+        showToast(t("settings.fontStorageFailed"), 4500);
+        return;
+      }
+      if (operation !== fontOperation) {
+        document.fonts.delete(face);
+        return;
+      }
+      writeStored("pi.customFontName", file.name);
+      applyImportedFont(face, file.name);
+      showToast(t("settings.fontImportSuccess"));
+    } finally {
+      if (operation === fontOperation) {
+        fontBusy = false;
+        refreshSettingsUI();
+      }
+    }
+  });
+  document.getElementById("custom-font-reset")!.addEventListener("click", async () => {
+    if (fontBusy) return;
+    const operation = ++fontOperation;
+    fontBusy = true;
+    refreshSettingsUI();
+    try {
+      await storeWallpaper(() => idbDelete("custom-font"));
+      if (operation !== fontOperation) return;
+      removeImportedFont();
+      showToast(t("settings.defaultFont"));
+    } catch {
+      showToast(t("settings.fontStorageFailed"), 4500);
+    } finally {
+      if (operation === fontOperation) {
+        fontBusy = false;
+        refreshSettingsUI();
+      }
+    }
+  });
+  const savedFontOperation = fontOperation;
+  void idbGet("custom-font").then(async (blob) => {
+    if (!blob || savedFontOperation !== fontOperation) return;
+    try {
+      const name = readStored("pi.customFontName") || "custom-font";
+      const face = await prepareFontFace(blob, name);
+      if (savedFontOperation !== fontOperation) {
+        document.fonts.delete(face);
+        return;
+      }
+      applyImportedFont(face, name);
+    } catch {
+      showToast(t("settings.fontImportInvalid"), 4500);
+    }
+  }).catch(() => {});
 
   let customWallpaperUrl: string | null = null;
   let wallpaperPreviewUrl: string | null = null;
@@ -721,7 +1101,6 @@ async function main() {
     }
     wallpaperName.textContent = name || t("ui.customWallpaper");
     wallpaperLabel.textContent = wallpaperName.textContent;
-    invoke("log_debug", { msg: `custom wallpaper: ${name || "?"} (${blob.type})` }).catch(() => {});
     if (oldUrl) URL.revokeObjectURL(oldUrl);
   };
 
@@ -787,28 +1166,24 @@ async function main() {
 
   let previousFocus: HTMLElement | null = null;
   let currentTab = "models";
-  const selectTab = (tab: string) => {
+  const settingsNavigation = setupSettingsNavigation(settingsPanel, (tab) => {
     currentTab = tab;
     keybinds?.cancel();
     if (tab === "agents") librarySettings?.refresh();
-    if (tab === "market") void agentMarket?.refresh();
-    settingsPanel.querySelectorAll<HTMLButtonElement>("[data-tab]").forEach((button) => {
-      const active = button.dataset.tab === tab;
-      button.setAttribute("aria-selected", String(active));
-      button.tabIndex = active ? 0 : -1;
-    });
-    settingsPanel.querySelectorAll<HTMLElement>("[data-pane]").forEach((pane) => {
-      pane.hidden = pane.dataset.pane !== tab;
-    });
-    settingsPanel.querySelector(".settings-content")!.scrollTop = 0;
-  };
+    if (tab === "market") void agentMarket?.open();
+    if (tab === "skills") void skillLibrary?.open();
+    if (tab === "harness") void harnessSettings?.refresh();
+    if (tab === "usage") void usageSettings?.refresh();
+    if (tab === "system") void systemSettings?.refresh();
+  });
+  const selectTab = settingsNavigation.select;
   const openSettings = (tab = currentTab) => {
     previousFocus = document.activeElement as HTMLElement;
     settingsPanel.hidden = false;
     document.getElementById("app-main")!.inert = true;
     document.getElementById("quickbar")!.inert = true;
-    selectTab(tab);
-    document.getElementById(`tab-${tab}`)!.focus();
+    selectTab(tab, true);
+    document.getElementById(`tab-${currentTab}`)!.focus();
   };
   const closeSettings = () => {
     keybinds?.cancel();
@@ -825,22 +1200,10 @@ async function main() {
   document.getElementById("welcome-model")!.addEventListener("click", () => openSettings("models"));
   document.getElementById("error-settings")!.addEventListener("click", () => openSettings("models"));
   document.getElementById("appearance-open")!.addEventListener("click", () => openSettings("appearance"));
+  document.getElementById("permissions-open")!.addEventListener("click", () => openSettings("harness"));
   document.getElementById("wallpaper-type")!.addEventListener("click", () => openSettings("appearance"));
   settingsPanel.addEventListener("click", (event) => {
     if (event.target === settingsPanel) closeSettings();
-    const tab = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-tab]");
-    if (tab) selectTab(tab.dataset.tab!);
-  });
-  settingsPanel.querySelector(".settings-tabs")!.addEventListener("keydown", (event) => {
-    const key = (event as KeyboardEvent).key;
-    if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(key)) return;
-    event.preventDefault();
-    const tabs = [...settingsPanel.querySelectorAll<HTMLButtonElement>("[data-tab]")];
-    const current = tabs.findIndex((tab) => tab.dataset.tab === currentTab);
-    const next = key === "Home" ? 0 : key === "End" ? tabs.length - 1
-      : (current + (key === "ArrowRight" ? 1 : -1) + tabs.length) % tabs.length;
-    selectTab(tabs[next].dataset.tab!);
-    tabs[next].focus();
   });
   selectTab(currentTab);
 
@@ -859,11 +1222,76 @@ async function main() {
   // —— 模型快捷选择（在设置面板里）——
   const modelSearch = document.getElementById("model-search") as HTMLInputElement;
   const modelList = document.getElementById("model-list") as HTMLDivElement;
+  const providerList = document.getElementById("provider-list") as HTMLDivElement;
+  const providerSearch = document.getElementById("provider-search") as HTMLInputElement;
+  const providerContent = document.getElementById("provider-content") as HTMLDivElement;
+  const providerEmpty = document.getElementById("provider-empty") as HTMLDivElement;
+  const providerTitle = document.getElementById("provider-title") as HTMLHeadingElement;
+  const providerKey = document.getElementById("provider-apikey") as HTMLInputElement;
+  const providerBaseUrl = document.getElementById("provider-baseurl") as HTMLInputElement;
+  const providerApi = document.getElementById("provider-api") as HTMLSelectElement;
+  const providerKeyState = document.getElementById("provider-key-state") as HTMLParagraphElement;
+  const providerSaveStatus = document.getElementById("provider-save-status") as HTMLSpanElement;
+  const providerCreateStatus = document.getElementById("provider-create-status") as HTMLDivElement;
+  const providerModelCount = document.getElementById("provider-model-count") as HTMLSpanElement;
+  const providerVisibleCount = document.getElementById("provider-visible-count") as HTMLSpanElement;
   let allModels: ModelInfo[] = [];
+  type ModelProvider = { id: string; api: string; baseurl: string; hasKey: boolean; modelCount: number };
+  let allProviders: ModelProvider[] = [];
+  let selectedProviderId = "";
   let currentModelRef = "";
   let modelsLoading = true;
   let modelsFailed = false;
   let modelBulk: ReturnType<typeof setupModelBulk> | undefined;
+  const providerModels = () => allModels.filter((model) => model.provider === selectedProviderId);
+  const renderProviders = () => {
+    const query = providerSearch.value.trim().toLowerCase();
+    const filtered = allProviders.filter((provider) => provider.id.toLowerCase().includes(query));
+    providerList.replaceChildren();
+    for (const provider of filtered) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "provider-item" + (provider.id === selectedProviderId ? " active" : "");
+      if (provider.id === selectedProviderId) button.setAttribute("aria-current", "true");
+      button.dataset.provider = provider.id;
+      const badge = document.createElement("span");
+      badge.className = "provider-mark";
+      badge.textContent = provider.id.slice(0, 1).toUpperCase();
+      const name = document.createElement("span");
+      name.className = "provider-item-name";
+      name.textContent = provider.id;
+      const status = document.createElement("span");
+      status.className = provider.hasKey ? "provider-key-dot configured" : "provider-key-dot";
+      status.title = provider.hasKey ? t("ui.keyConfigured") : t("ui.keyMissing");
+      status.setAttribute("aria-label", status.title);
+      button.append(badge, name, status);
+      providerList.append(button);
+    }
+    if (!filtered.length) {
+      const empty = document.createElement("div");
+      empty.className = "provider-list-empty";
+      empty.textContent = allProviders.length ? t("ui.noProviderMatch") : t("ui.noProvider");
+      providerList.append(empty);
+    }
+  };
+  const renderProviderDetails = () => {
+    const provider = allProviders.find((entry) => entry.id === selectedProviderId);
+    providerContent.hidden = !provider;
+    providerEmpty.hidden = Boolean(provider);
+    if (!provider) return;
+    providerTitle.textContent = provider.id;
+    providerModelCount.textContent = t("ui.providerModelCount").replace("{count}", String(provider.modelCount));
+    providerKeyState.textContent = t(provider.hasKey ? "ui.keyConfiguredHint" : "ui.keyMissingHint");
+    providerKey.placeholder = t(provider.hasKey ? "ui.keepExistingKey" : "ui.enterApiKey");
+    providerBaseUrl.value = provider.baseurl;
+    if ([...providerApi.options].some((option) => option.value === provider.api)) providerApi.value = provider.api;
+    else {
+      const option = document.createElement("option");
+      option.value = provider.api; option.textContent = provider.api; providerApi.add(option); providerApi.value = provider.api;
+    }
+    providerSaveStatus.textContent = "";
+    providerKey.value = "";
+  };
   const refreshCurrentModel = () => {
     const model = allModels.find((entry) => entry.value === currentModelRef);
     const label = document.getElementById("current-model")!;
@@ -874,12 +1302,14 @@ async function main() {
 
   const renderModelList = () => {
     const query = modelSearch.value.trim().toLowerCase();
+    const providerItems = providerModels();
     const filtered = query
-      ? allModels.filter((m) => m.value.toLowerCase().includes(query) || m.name.toLowerCase().includes(query))
-      : allModels;
+      ? providerItems.filter((m) => m.value.toLowerCase().includes(query) || m.name.toLowerCase().includes(query))
+      : providerItems;
+    providerVisibleCount.textContent = `(${filtered.length})`;
     modelList.textContent = "";
     if (filtered.length === 0) {
-      modelBulk?.update(allModels, filtered, modelsLoading);
+      modelBulk?.update(providerItems, filtered, modelsLoading);
       const empty = document.createElement("div");
       empty.className = "model-empty";
       empty.textContent = t(modelsLoading ? "ui.modelLoading" : modelsFailed ? "ui.modelFailed"
@@ -888,10 +1318,20 @@ async function main() {
       return;
     }
     renderModelRows(modelList, filtered, currentModelRef, t, modelBulk?.selected);
-    modelBulk?.update(allModels, filtered, modelsLoading);
+    modelBulk?.update(providerItems, filtered, modelsLoading);
   };
 
   modelSearch.addEventListener("input", renderModelList);
+  providerSearch.addEventListener("input", renderProviders);
+  providerList.addEventListener("click", (event) => {
+    const button = (event.target as HTMLElement).closest<HTMLButtonElement>(".provider-item");
+    if (!button || !allProviders.some((provider) => provider.id === button.dataset.provider)) return;
+    selectedProviderId = button.dataset.provider!;
+    renderProviders();
+    renderProviderDetails();
+    modelSearch.value = "";
+    renderModelList();
+  });
   modelSearch.addEventListener("keydown", (e) => {
     // 在搜索框里按 Esc 就收起面板
     if (e.key === "Escape") closeSettings();
@@ -917,7 +1357,7 @@ async function main() {
       await workbench!.executeCommand(`/model ${value}`);
       showToast(currentLang === "en" ? "Model switch sent to Pi." : "模型切换指令已发送到 Pi。");
     },
-    error: (error) => showToast(String(error), 4500),
+    error: (error) => showToast(formatUserError(error), 4500),
   });
 
   renderModelList();
@@ -928,18 +1368,29 @@ async function main() {
     modelsFailed = false;
     renderModelList();
     try {
-      const data = await invoke<{ current: string; models: ModelInfo[]; removedCount?: number }>("list_models");
+      const data = await invoke<{ current: string; models: ModelInfo[]; providers?: ModelProvider[]; removedCount?: number }>("list_models");
       if (generation !== modelLoadGeneration) return;
       const restore = document.getElementById("models-restore") as HTMLButtonElement;
       restore.hidden = !data.removedCount;
       allModels = data.models || [];
+      allProviders = data.providers || [];
       currentModelRef = data.current || currentModelRef;
+      const currentProvider = currentModelRef.split("/", 1)[0];
+      if (!allProviders.some((provider) => provider.id === selectedProviderId)) {
+        selectedProviderId = allProviders.some((provider) => provider.id === currentProvider) ? currentProvider : allProviders[0]?.id || "";
+      }
+      renderProviders();
+      renderProviderDetails();
       modelsLoading = false;
       renderModelList();
       refreshCurrentModel();
     } catch (error) {
       if (generation !== modelLoadGeneration) return;
       allModels = [];
+      allProviders = [];
+      selectedProviderId = "";
+      renderProviders();
+      renderProviderDetails();
       modelsLoading = false;
       modelsFailed = true;
       renderModelList();
@@ -950,7 +1401,7 @@ async function main() {
     const button = document.getElementById("models-restore") as HTMLButtonElement;
     button.disabled = true;
     try { await invoke("restore_removed_models"); await loadModels(true); showToast(t("ui.modelsRestored")); }
-    catch (error) { showToast(String(error), 4500); }
+    catch (error) { showToast(formatUserError(error), 4500); }
     finally { button.disabled = false; }
   });
   void loadModels();
@@ -966,23 +1417,75 @@ async function main() {
     confirm: (models, clear) => confirmModelBatch(models, clear, t),
     deleteModels: async (models) => { await invoke("delete_models", { models }); await loadModels(true); },
     changed: () => { renderModelList(); showToast(t("ui.modelDeleted")); },
-    error: (error) => showToast(String(error), 4500),
+    error: (error) => showToast(formatUserError(error), 4500),
   });
   renderModelList();
 
-  // —— 添加模型：写入 ~/.pi/agent/models.json ——
+  // Provider settings are saved separately from model entries; an empty key preserves the stored secret.
+  const providerSaveButton = document.getElementById("provider-save-btn") as HTMLButtonElement;
+  const saveProvider = async (quiet = false) => {
+    if (!selectedProviderId) throw new Error(t("ui.noProvider"));
+    const baseurl = providerBaseUrl.value.trim();
+    if (baseurl && !isHttpUrl(baseurl)) throw new Error(t("ui.invalidUrl"));
+    await invoke("save_model_provider", {
+      provider: selectedProviderId,
+      api: providerApi.value,
+      baseurl,
+      apikey: providerKey.value.trim(),
+    });
+    providerKey.value = "";
+    if (!quiet) {
+      await loadModels(true);
+      providerSaveStatus.textContent = t("ui.providerSaved");
+    }
+  };
+  providerSaveButton.addEventListener("click", async () => {
+    providerSaveButton.disabled = true;
+    providerSaveStatus.textContent = t("ui.savingProvider");
+    try { await saveProvider(); }
+    catch (error) { providerSaveStatus.textContent = formatUserError(error); }
+    finally { providerSaveButton.disabled = false; }
+  });
+  const providerCreateButton = document.getElementById("provider-create-btn") as HTMLButtonElement;
+  providerCreateButton.addEventListener("click", async () => {
+    const id = (document.getElementById("provider-new-id") as HTMLInputElement).value.trim();
+    const api = (document.getElementById("provider-new-api") as HTMLSelectElement).value;
+    if (!id || /[\/\\\s\0]/.test(id)) {
+      providerCreateStatus.textContent = t("ui.invalidProviderId");
+      return;
+    }
+    if (allProviders.some((provider) => provider.id === id)) {
+      selectedProviderId = id;
+      renderProviders();
+      renderProviderDetails();
+      providerCreateStatus.textContent = t("ui.providerExists");
+      return;
+    }
+    providerCreateButton.disabled = true;
+    providerCreateStatus.textContent = t("ui.savingProvider");
+    try {
+      await invoke("create_model_provider", { provider: id, api });
+      selectedProviderId = id;
+      (document.getElementById("provider-new-id") as HTMLInputElement).value = "";
+      (document.querySelector(".provider-create") as HTMLDetailsElement).open = false;
+      await loadModels(true);
+      providerCreateStatus.textContent = t("ui.providerAdded");
+    } catch (error) { providerCreateStatus.textContent = formatUserError(error); }
+    finally { providerCreateButton.disabled = false; }
+  });
+
+  // Add a model to the selected provider; connection fields stay in the provider panel.
   const modelAddBtn = document.getElementById("model-add-btn") as HTMLButtonElement;
   const modelAddStatus = document.getElementById("model-add-status") as HTMLDivElement;
   const inputValue = (id: string) => (document.getElementById(id) as HTMLInputElement).value.trim();
   modelAddBtn.addEventListener("click", async () => {
-    const provider = inputValue("model-add-provider");
-    const api = (document.getElementById("model-add-api") as HTMLSelectElement).value;
-    const baseurl = inputValue("model-add-baseurl");
-    const apikey = inputValue("model-add-apikey");
+    const provider = selectedProviderId;
+    const api = providerApi.value;
+    const baseurl = providerBaseUrl.value.trim();
     const modelid = inputValue("model-add-id");
     const modelname = inputValue("model-add-name");
     if (!provider || !modelid) {
-      modelAddStatus.textContent = "请至少填写供应商和模型 ID";
+      modelAddStatus.textContent = t("ui.selectProviderAndModel");
       return;
     }
     if (baseurl && !isHttpUrl(baseurl)) {
@@ -990,17 +1493,16 @@ async function main() {
       return;
     }
     modelAddBtn.disabled = true;
-    modelAddStatus.textContent = "添加中…";
+    modelAddStatus.textContent = t("ui.addingModel");
     try {
-      await invoke("add_custom_model", { provider, api, baseurl, apikey, modelids: modelid, modelname });
-      modelAddStatus.textContent = `已添加 ${provider}/${modelid} · 在 pi 里执行 /model 或重启后可用`;
-      const data = await invoke<{ current: string; models: ModelInfo[] }>("list_models");
-      allModels = data.models || [];
-      currentModelRef = data.current || currentModelRef;
-      renderModelList();
-      (document.getElementById("model-add-apikey") as HTMLInputElement).value = "";
+      await saveProvider(true);
+      await invoke("add_custom_model", { provider, api, baseurl, apikey: "", modelids: modelid, modelname });
+      modelAddStatus.textContent = t("ui.modelAdded").replace("{model}", `${provider}/${modelid}`);
+      await loadModels(true);
+      (document.getElementById("model-add-id") as HTMLInputElement).value = "";
+      (document.getElementById("model-add-name") as HTMLInputElement).value = "";
     } catch (e) {
-      modelAddStatus.textContent = `添加失败：${String(e)}`;
+      modelAddStatus.textContent = `${t("ui.modelAddFailed")}: ${formatUserError(e)}`;
     } finally {
       modelAddBtn.disabled = false;
     }
@@ -1018,64 +1520,21 @@ async function main() {
     pluginStatus.textContent = "安装中…（可能需要联网，请稍等）";
     pluginInstallBtn.disabled = true;
     try {
-      const out = await invoke<string>("install_package", { source });
-      pluginStatus.textContent = `已导入，执行 /reload 或重启 pi 后生效${out ? `：${out}` : ""}`.slice(0, 500);
-      invoke("log_debug", { msg: `install_package ok: ${source}` }).catch(() => {});
+      await invoke("install_package", { source });
+      pluginStatus.textContent = "已导入，执行 /reload 或重启 pi 后生效";
+      invoke("log_debug", { msg: "install_package completed" }).catch(() => {});
     } catch (e) {
-      pluginStatus.textContent = `导入失败：${String(e)}`.slice(0, 500);
-      invoke("log_debug", { msg: `install_package failed: ${source} :: ${String(e)}` }).catch(() => {});
+      pluginStatus.textContent = "导入失败，请检查来源、权限和网络设置。";
+      invoke("log_debug", { msg: "install_package failed" }).catch(() => {});
     } finally {
       pluginInstallBtn.disabled = false;
-    }
-  });
-
-  // —— 中转站（OpenAI 兼容 relay）——
-  const relayAddBtn = document.getElementById("relay-add-btn") as HTMLButtonElement;
-  const relayStatus = document.getElementById("relay-status") as HTMLDivElement;
-  relayAddBtn.addEventListener("click", async () => {
-    const provider = "relay";
-    const baseurl = inputValue("relay-baseurl");
-    const apikey = inputValue("relay-apikey");
-    const modelids = inputValue("relay-models");
-    if (!baseurl) {
-      relayStatus.textContent = "请填写中转站地址";
-      return;
-    }
-    if (!modelids) {
-      relayStatus.textContent = "请填写至少一个模型 ID";
-      return;
-    }
-    if (!isHttpUrl(baseurl)) {
-      relayStatus.textContent = t("ui.invalidUrl");
-      return;
-    }
-    relayAddBtn.disabled = true;
-    relayStatus.textContent = "添加中…";
-    try {
-      await invoke("add_custom_model", {
-        provider,
-        api: "openai-completions",
-        baseurl,
-        apikey,
-        modelids,
-        modelname: "",
-      });
-      relayStatus.textContent = `已添加中转站「${provider}」· 点模型列表即可切换`;
-      const data = await invoke<{ current: string; models: ModelInfo[] }>("list_models");
-      allModels = data.models || [];
-      currentModelRef = data.current || currentModelRef;
-      renderModelList();
-      (document.getElementById("relay-apikey") as HTMLInputElement).value = "";
-    } catch (e) {
-      relayStatus.textContent = `添加失败：${String(e)}`;
-    } finally {
-      relayAddBtn.disabled = false;
     }
   });
 
   // —— 左侧快捷指令栏 ——
   const quickbar = document.getElementById("quickbar") as HTMLDivElement;
   const quickbarToggle = document.getElementById("quickbar-toggle") as HTMLButtonElement;
+  const workSidebarToggle = document.getElementById("work-sidebar-toggle") as HTMLButtonElement;
   const quickbarList = document.getElementById("quickbar-list") as HTMLDivElement;
   const quickbarAddBtn = document.getElementById("quickbar-add-btn") as HTMLButtonElement;
   const quickbarResetBtn = document.getElementById("quickbar-reset-btn") as HTMLButtonElement;
@@ -1242,7 +1701,7 @@ async function main() {
       }
       closeMobileSidebar();
       focusTerminal();
-    })().catch((error) => showToast(String(error), 5000)).finally(() => {
+    })().catch((error) => showToast(formatUserError(error), 5000)).finally(() => {
       quickCommandRunning = false; b.disabled = false;
     });
   };
@@ -1317,6 +1776,7 @@ async function main() {
       : !document.body.classList.contains("sidebar-hidden");
     sidebarBackdrop.hidden = !overlay || !open;
     quickbarToggle.setAttribute("aria-expanded", String(open));
+    workSidebarToggle.setAttribute("aria-expanded", String(open));
     quickbar.inert = (!open || !settingsPanel.hidden);
   };
   const closeMobileSidebar = () => {
@@ -1334,6 +1794,7 @@ async function main() {
     syncSidebar();
     scheduleResize();
   });
+  workSidebarToggle.addEventListener("click", () => quickbarToggle.click());
   document.getElementById("sidebar-close")!.addEventListener("click", closeMobileSidebar);
   sidebarBackdrop.addEventListener("click", closeMobileSidebar);
   narrowWindow.addEventListener("change", () => { closeMobileSidebar(); scheduleResize(); });
@@ -1346,29 +1807,19 @@ async function main() {
       setActiveQuick(null);
       closeMobileSidebar();
       focusTerminal();
-    }).catch((error) => showToast(String(error), 5000));
+    }).catch((error) => showToast(formatUserError(error), 5000));
   };
   document.getElementById("new-session")!.addEventListener("click", () => runSessionCommand("/new"));
   document.getElementById("welcome-session")!.addEventListener("click", () => runSessionCommand("/new"));
   document.getElementById("welcome-resume")!.addEventListener("click", () => runSessionCommand("/resume"));
 
   // —— 底部发送模式：发送 / 控制 / 排队任务 ——
-  const sendmodeBar = document.getElementById("sendmode-bar") as HTMLDivElement;
-  const applySendMode = (mode: string) => {
-    sendMode = normalizeSendMode(mode);
-    sendmodeBar.querySelectorAll<HTMLButtonElement>(".sendmode").forEach((b) => {
-      b.classList.toggle("active", b.dataset.mode === sendMode);
-      b.setAttribute("aria-pressed", String(b.dataset.mode === sendMode));
-    });
-    writeStored("pi.sendMode", sendMode);
-  };
-  sendmodeBar.addEventListener("click", (e) => {
-    const b = (e.target as HTMLElement).closest(".sendmode") as HTMLButtonElement | null;
-    if (!b) return;
-    applySendMode(b.dataset.mode || "send");
-    setTimeout(() => workbench?.focusInput(), 0);
+  const sendModeControls = setupSendModeControls({
+    root: document.getElementById("sendmode-bar")!,
+    initial: readStored("pi.sendMode") || "send",
+    changed: mode => { sendMode = mode; writeStored("pi.sendMode", mode); workbench?.refreshStrings(); },
+    selected: () => { setTimeout(() => workbench?.focusInput(), 0); },
   });
-  applySendMode(readStored("pi.sendMode") || "send");
 
   // —— 语言切换 + 语言包导入 ——
   const languageSelect = document.getElementById("language-select") as HTMLSelectElement;
@@ -1398,14 +1849,7 @@ async function main() {
     document.querySelectorAll<HTMLElement>("[data-i18n]").forEach((el) => {
       el.textContent = t(el.dataset.i18n!);
     });
-    document.querySelectorAll<HTMLElement>("[data-i18n-ph]").forEach((el) => {
-      el.setAttribute("placeholder", t(el.dataset.i18nPh!));
-      if (!(el as HTMLInputElement).labels?.length) el.setAttribute("aria-label", t(el.dataset.i18nPh!));
-    });
-    document.querySelectorAll<HTMLElement>("[data-i18n-title]").forEach((el) => {
-      el.setAttribute("title", t(el.dataset.i18nTitle!));
-      el.setAttribute("aria-label", t(el.dataset.i18nTitle!));
-    });
+    applyLocalizedControlLabels(document, t);
     refreshSettingsUI();
     applyWallpaper(wallpaperOn, false);
     renderLanguageOptions();
@@ -1414,6 +1858,10 @@ async function main() {
     keybinds?.refreshLanguage();
     librarySettings?.refreshLanguage();
     agentMarket?.refreshLanguage();
+    skillLibrary?.refreshLanguage();
+    harnessSettings?.refreshLanguage();
+    usageSettings?.refreshLanguage();
+    systemSettings?.refreshLanguage();
   };
 
   languageSelect.addEventListener("change", () => applyLanguage(languageSelect.value));
@@ -1433,108 +1881,35 @@ async function main() {
     }
   });
 
-  // —— 模型人设导入（写入 pi 的 APPEND_SYSTEM.md）——
-  const personaText = document.getElementById("persona-text") as HTMLTextAreaElement;
-  const personaStatus = document.getElementById("persona-status") as HTMLDivElement;
-  const personaFile = document.getElementById("persona-file") as HTMLInputElement;
-  const personaImportBtn = document.getElementById("persona-import-btn") as HTMLButtonElement;
-  const personaSaveBtn = document.getElementById("persona-save-btn") as HTMLButtonElement;
-  const personaClearBtn = document.getElementById("persona-clear-btn") as HTMLButtonElement;
-
-  invoke<string>("read_persona")
-    .then((txt) => {
-      personaText.value = txt || "";
-    })
-    .catch((error) => {
-      personaStatus.textContent = String(error);
-      personaSaveBtn.disabled = true;
-      personaClearBtn.disabled = true;
-    });
-  personaImportBtn.addEventListener("click", () => personaFile.click());
-  personaFile.addEventListener("change", async () => {
-    const f = personaFile.files?.[0];
-    personaFile.value = "";
-    if (!f) return;
-    personaText.value = await f.text();
-    personaStatus.textContent = t("persona.loaded");
-  });
-  personaSaveBtn.addEventListener("click", async () => {
-    try {
-      await invoke("save_persona", { text: personaText.value });
-      personaStatus.textContent = t("persona.saved");
-      invoke("log_debug", { msg: `persona saved (${personaText.value.length} chars)` }).catch(() => {});
-    } catch (e) {
-      personaStatus.textContent = String(e);
-    }
-  });
-  personaClearBtn.addEventListener("click", async () => {
-    try {
-      await invoke("save_persona", { text: "" });
-      personaText.value = "";
-      personaStatus.textContent = t("persona.cleared");
-    } catch (e) {
-      personaStatus.textContent = String(e);
-    }
-  });
+  personaSettings = setupPersonaSettings({ invoke, translate: t, formatError: formatUserError });
 
   renderLanguageOptions();
   applyLanguage(currentLang);
 
-  // —— 一键隐藏代码（隐藏终端，露出壁纸）——
+  // —— 对话视图与终端视图互斥，避免原始输出叠在图形对话上 ——
   const hideToggle = document.getElementById("hide-toggle") as HTMLButtonElement;
   const applyHideTerminal = (hidden: boolean) => {
     document.body.classList.toggle("hide-terminal", hidden);
-    hideToggle.replaceChildren(icon(hidden ? "eye-off" : "eye"));
+    document.body.classList.toggle("terminal-view", !hidden);
+    hideToggle.replaceChildren(icon(hidden ? "terminal-square" : "bot"));
     hideToggle.title = t(hidden ? "title.showCode" : "title.hideCode");
     hideToggle.setAttribute("aria-label", hideToggle.title);
-    hideToggle.setAttribute("aria-pressed", String(hidden));
-    writeStored("pi.hideTerminal", hidden ? "1" : "0");
-    if (!hidden) setTimeout(focusTerminal, 0);
+    hideToggle.setAttribute("aria-pressed", String(!hidden));
+    writeStored("pi.terminalView", hidden ? "0" : "1");
+    if (hidden) setTimeout(() => (document.getElementById("composer-input") as HTMLTextAreaElement | null)?.focus(), 0);
+    else setTimeout(focusTerminal, 0);
   };
   hideToggle.addEventListener("click", () => {
     applyHideTerminal(!document.body.classList.contains("hide-terminal"));
   });
-  applyHideTerminal(readStored("pi.hideTerminal") === "1");
+  applyHideTerminal(readStored("pi.terminalView") !== "1");
 
-  // —— 模型强度（thinking level）下拉 ——
-  const thinkingSelect = document.getElementById("thinking-select") as HTMLSelectElement;
-  const THINKING_LEVELS: { value: string; zh: string; en: string }[] = [
-    { value: "off", zh: "关", en: "off" },
-    { value: "minimal", zh: "极低", en: "minimal" },
-    { value: "low", zh: "低", en: "low" },
-    { value: "medium", zh: "中", en: "medium" },
-    { value: "high", zh: "高", en: "high" },
-    { value: "max", zh: "极高", en: "max" },
-  ];
-  const renderThinkingOptions = () => {
-    const prev = thinkingSelect.value || readStored("pi.thinking") || "medium";
-    thinkingSelect.textContent = "";
-    for (const lv of THINKING_LEVELS) {
-      const opt = document.createElement("option");
-      opt.value = lv.value;
-      opt.textContent = currentLang === "en" ? lv.en : lv.zh;
-      thinkingSelect.appendChild(opt);
-    }
-    thinkingSelect.value = THINKING_LEVELS.some((l) => l.value === prev) ? prev : "medium";
-  };
-  renderThinkingOptions();
+  thinkingControls = setupThinkingControls({invoke, language: () => currentLang, error: (error) => showToast(formatUserError(error))});
   onLanguageChange = () => {
-    refreshWindowControls();
-    refreshRendererStatus();
-    renderThinkingOptions();
-    renderQuickbar();
-    renderModelList();
-    refreshCurrentModel();
-    refreshConnectionStatus();
-    applyHideTerminal(document.body.classList.contains("hide-terminal"));
-    refreshWallpaperName();
+    refreshWindowControls(); refreshRendererStatus(); thinkingControls?.refreshLanguage();
+    renderQuickbar(); renderModelList(); refreshCurrentModel(); refreshConnectionStatus();
+    applyHideTerminal(document.body.classList.contains("hide-terminal")); refreshWallpaperName();
   };
-  thinkingSelect.addEventListener("change", () => {
-    const level = thinkingSelect.value;
-    writeStored("pi.thinking", level);
-    workbench?.executeCommand(`/thinking ${level}`).catch((error) => showToast(String(error)));
-    setTimeout(focusTerminal, 0);
-  });
 
   // —— 终端/文字透明度 ——
   const opacityRange = document.getElementById("opacity-range") as HTMLInputElement;
@@ -1550,10 +1925,40 @@ async function main() {
   applyOpacity(Number(opacityRange.value));
 
   keybinds = setupKeybindingSettings({ invoke, translate: t, nativeReady: () => connected });
-  librarySettings = setupLibrarySettings({ invoke, translate: t, toast: showToast });
-  agentMarket = setupAgentMarket({ invoke, translate: t, changed: () => librarySettings?.refresh(), openLibrary: () => selectTab("agents") });
+  librarySettings = setupLibrarySettings({ invoke, translate: t, toast: showToast, openMarket: () => selectTab("market") });
+  skillLibrary = setupSkillLibrary({invoke, language: () => currentLang, toast: showToast, reconnect: async () => {
+    if (!isDesktop) throw Error("浏览器预览未连接本地 Skill 商店服务。");
+    await bridgeInvoke("skill_store_restart");
+  }, reload: async () => {
+    const state = workbench?.getState();
+    if (!state?.connected || !state.ready || state.busy || state.commandPending) throw Error("Skill 已保存；请等待 Pi 空闲后重新加载。");
+    const expected = await invoke<{data:{skills:{name:string;enabled:boolean}[];revision:number}}>("skill_store_action",{text:JSON.stringify({kind:"skills",action:"list"})});
+    const expectedNames = expected.data.skills.filter((skill) => skill.enabled).map((skill) => skill.name);
+    await workbench!.executeCommand("/reload");
+    const deadline = Date.now() + 12000;
+    let skillError = "";
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    while (Date.now() < deadline) {
+      const current = await invoke<{connected:boolean;ready:boolean;commandPending?:boolean;skills?:string[];skillRevision?:number;skillError?:string}>("gui_status");
+      if (current.connected && current.ready && !current.commandPending && current.skillRevision === expected.data.revision && expectedNames.every((name) => current.skills?.includes(name))) return;
+      skillError = current.skillError || "";
+      await new Promise((resolve) => setTimeout(resolve, 250));
+    }
+    throw Error(skillError || "Skill 已保存；Pi 尚未确认重新加载，可稍后重试。");
+  }});
+  agentMarket = setupAgentMarket({ invoke, translate: t, changed: () => librarySettings?.refresh(), openLibrary: () => selectTab("agents"),
+    reconnect: async () => { await bridgeInvoke("skill_store_restart"); } });
+  harnessSettings = setupHarnessSettings({ invoke, language: () => currentLang, engine: () => agentRuntime?.engine() || "pi", configured: () => librarySettings?.refresh() });
+  usageSettings = setupUsageSettings({ invoke, language: () => currentLang });
+  systemSettings = setupSystemSettings({ invoke, language: () => currentLang, notice: showToast, openPiUpdates: () => openSettings("system"),
+    checkPiUpdate: isDesktop ? async () => {
+      // Pi core checks must not be routed to the selected Claude engine.
+      const response = await bridgeInvoke<{ data: unknown }>("gui_action", { action: "check_update" });
+      return response.data;
+    } : undefined });
   const nativeCommandKey = (event: KeyboardEvent) => {
-    if (!event.metaKey || !settingsPanel.hidden || !(event.target instanceof Element)
+    const primaryModifier = isWindowsPlatform() ? event.ctrlKey : event.metaKey;
+    if (!primaryModifier || event.altKey || !settingsPanel.hidden || !(event.target instanceof Element)
       || !event.target.closest("#terminal") || !keybinds?.nativeMatches(event)) return;
     const sequence = terminalKeySequence(event);
     if (!sequence) return;
@@ -1587,7 +1992,7 @@ async function main() {
         paths?: string[];
         position?: unknown;
       };
-      debug(`drag ${p.type} paths=${JSON.stringify(p.paths ?? [])} pos=${JSON.stringify(p.position ?? null)}`);
+      debug(`drag ${p.type} files=${Array.isArray(p.paths) ? p.paths.length : 0}`);
       if (p.type === "enter" || p.type === "over") {
         terminalEl.classList.add("drag-over");
         showToast("松开鼠标即可把文件加入输入框", 4000);
@@ -1598,8 +2003,8 @@ async function main() {
         terminalEl.classList.remove("drag-over");
         const paths = (p.paths || []).filter((x): x is string => typeof x === "string");
         if (paths.length > 0) {
-          workbench?.addPaths(paths);
-          showToast(`已添加 ${paths.length} 个文件`);
+          const added = workbench?.addPaths(paths) ?? 0;
+          showToast(added > 0 ? `已添加 ${added} 个文件` : "没有添加新文件，请检查路径、重复附件或数量上限");
         } else {
           showToast("没有识别到文件路径", 4000);
         }
@@ -1607,7 +2012,7 @@ async function main() {
     })
     .catch((e) => {
       console.warn("拖放 API 不可用", e);
-      debug(`onDragDropEvent failed: ${String(e)}`);
+      debug("onDragDropEvent unavailable");
       showToast("拖放 API 不可用", 5000);
     });
 
@@ -1631,8 +2036,13 @@ async function main() {
   };
   let terminalGeneration = 0;
   let startupPoll: ReturnType<typeof setTimeout> | undefined;
+  let lastDiagnosticBridgeState: boolean | undefined;
+  const refreshVisibleDiagnostics = () => {
+    if (currentTab === "system") void systemSettings?.refresh();
+  };
   // Retry and recovery must return to the workspace and session the user was actually using.
   let lastTarget: { cwd?: string; session?: string } = {};
+  let savedResumeIdentity = "", resumeStorageFailed = false;
   let libraryLoadedFor = "";
   const connect = async (cwd?: string, session?: string) => {
     if (connecting || connected || !isDesktop) return;
@@ -1641,9 +2051,12 @@ async function main() {
     retryConnection.disabled = true;
     connectionError.hidden = true;
     setConnection("ui.connecting", "connecting");
+    // Do not probe an absent/previous process while native startup is pending.
+    // Resume only after spawn succeeds so its actual error remains visible.
+    piRecovery?.pause();
     const generation = ++terminalGeneration;
     try {
-      fitAddon.fit();
+      if (document.getElementById("terminal")!.getClientRects().length) fitAddon.fit();
       const onData = new Channel<number[]>();
       const onExit = new Channel<string>();
       let exited = false;
@@ -1657,33 +2070,38 @@ async function main() {
         document.getElementById("connection-error-text")!.textContent = t("ui.terminalExited");
         connectionError.hidden = false;
         workbench?.disconnected();
+        refreshVisibleDiagnostics();
       };
       const info = await bridgeInvoke<{ cwd: string; executable: string; bridgeId: string }>("start_terminal", {
         rows: term.rows, cols: term.cols, onData, onExit, cwd, session,
       });
+      if (generation !== terminalGeneration) return;
       connected = !exited;
       sizeReporter.reset();
       if (connected) setConnection("ui.connected", "connected");
       if (info.cwd) lastTarget = { cwd: info.cwd, session };
       updateRuntime(info);
       workbench?.setRuntime(info);
+      refreshVisibleDiagnostics();
       const synchronize = (remaining: number) => {
         if (generation !== terminalGeneration || !connected) return;
         void workbench?.synchronize().catch(() => {});
         if (remaining > 0) startupPoll = setTimeout(() => synchronize(remaining - 1), 700);
       };
       synchronize(12);
+      piRecovery?.monitor();
       scheduleResize();
       if (connected) focusTerminal();
     } catch (error) {
+      if (generation !== terminalGeneration) return;
       connected = false;
       setConnection("ui.connectionFailed", "error");
-      document.getElementById("connection-error-text")!.textContent = String(error);
+      document.getElementById("connection-error-text")!.textContent = formatUserError(error, t("ui.connectionFailed"));
       connectionError.hidden = false;
       workbench?.disconnected();
+      refreshVisibleDiagnostics();
     } finally {
-      connecting = false;
-      retryConnection.disabled = false;
+      if (generation === terminalGeneration) { connecting = false; retryConnection.disabled = false; }
     }
   };
   const updateRuntime = (info: { cwd: string; executable: string }) => {
@@ -1695,40 +2113,91 @@ async function main() {
   };
   workbench = setupWorkbench({
     desktop: isDesktop,
+    engine: () => agentRuntime?.engine() || "pi",
+    beforeSubmit: async (text) => {
+      await personaSettings?.flush();
+      await agentRuntime?.prepareForSubmit(text);
+    },
     invoke,
     matchesShortcut: (id, event) => keybinds?.matches(id, event) ?? false,
     language: () => currentLang,
     mode: () => sendMode,
     toast: showToast,
+    conversationSubmit: (text, attachments) => conversationView?.addUserMessage(text, attachments),
     resize: scheduleResize,
     focusTerminal,
     settings: () => openSettings(),
     panelOpened: closeMobileSidebar,
     prepareCommand: () => {
       if (!settingsPanel.hidden) closeSettings();
-      if (document.body.classList.contains("hide-terminal")) document.getElementById("hide-toggle")!.click();
+      if (document.body.classList.contains("terminal-view")) document.getElementById("hide-toggle")!.click();
     },
     stateChanged: (state) => {
+      if (state.connected && (agentRuntime?.engine() || "pi") === "pi") systemSettings?.observePiUpdate(state.coreUpdate);
+      const bridgeConnected = state.connected === true;
+      if (lastDiagnosticBridgeState !== bridgeConnected) {
+        lastDiagnosticBridgeState = bridgeConnected;
+        refreshVisibleDiagnostics();
+      }
+      agentSessionStrip.update(state);
+      const conversationBridge = workbench?.runtimeId() || "";
+      if (state.connected && (agentRuntime?.engine() || "pi") === "pi" && conversationBridge && state.sessionId) {
+        conversationSync.observe({ bridgeId: conversationBridge, sessionId: state.sessionId });
+      } else if (state.connected === false || (agentRuntime?.engine() || "pi") !== "pi") conversationSync.observe();
+      if (state.connected && (agentRuntime?.engine() || "pi") === "pi" && conversationBridge) {
+        piPermissions.observe({ bridgeId: conversationBridge, sessionId: state.sessionId || "" }, state.approvals);
+      } else piPermissions.observe();
+      conversationView?.setState(state);
+      harnessSettings?.observe(state.task, state.cwd);
+      if (state.cwd) librarySettings?.setWorkspace(state.cwd);
       // Load the Agent picker once per Pi process; the library is served by Pi's GUI extension.
       if (state.connected && state.ready && libraryLoadedFor !== lastTarget.cwd + ":" + (state.sessionId || "")) {
         libraryLoadedFor = lastTarget.cwd + ":" + (state.sessionId || "");
         librarySettings?.refresh();
+        if (!document.getElementById("pane-skills")!.hidden) void skillLibrary?.open();
+        else void skillLibrary?.refresh();
       }
       // Track the live session so a retry after a crash or /quit resumes it instead of starting fresh.
-      if (state.cwd) lastTarget = { cwd: state.cwd, session: state.session || lastTarget.session };
+      if (state.cwd) lastTarget = { cwd: state.cwd, session: state.session || (lastTarget.cwd === state.cwd ? lastTarget.session : undefined) };
+      if (state.connected && state.cwd && state.session && !resumeStorageFailed) {
+        const identity = JSON.stringify([state.cwd, state.session]);
+        if (identity !== savedResumeIdentity) {
+          try {
+            const raw = localStorage.getItem(RESUME_KEY);
+            let prior: ReturnType<typeof readResumeTargets>;
+            try { prior = readResumeTargets(raw); }
+            catch {
+              localStorage.setItem(`${RESUME_KEY}.damaged`, raw || "");
+              prior = [];
+              showToast(currentLang === "en" ? "Recovery index rebuilt; original sessions and the damaged index are preserved." : "已重建恢复入口；原会话和损坏索引均已保留。", 7000);
+            }
+            localStorage.setItem(RESUME_KEY, storeResumeTarget(prior, { cwd: state.cwd, session: state.session, updatedAt: Date.now() }));
+            savedResumeIdentity = identity;
+          } catch (error) { resumeStorageFailed = true; showToast(formatUserError(error), 7000); }
+        }
+      }
       if (state.model && currentModelRef !== state.model) {
         currentModelRef = state.model;
         refreshCurrentModel();
         renderModelList();
       }
-      if (state.thinking && [...thinkingSelect.options].some((option) => option.value === state.thinking)) {
-        thinkingSelect.value = state.thinking;
+      thinkingControls?.update(state);
+      if (state.connected && !connecting) {
+        if (state.inputRecovery) {
+          document.getElementById("connection-error-text")!.textContent = currentLang === "en"
+            ? "The last input is unconfirmed. Stop it first, or restart Pi and review the restored session before resending. Your draft is preserved."
+            : "上一条输入尚未确认，草稿已保留。请先停止；若仍未恢复，可重启 Pi，并核对恢复的会话后再发送。";
+          retryConnection.textContent = currentLang === "en" ? "Restart Pi" : "重启 Pi";
+          connectionError.hidden = false;
+        } else if (!connectionError.hidden) { connectionError.hidden = true; setConnection("ui.connected", "connected"); }
       }
     },
     reconnect: async (cwd, session) => {
       if (connecting) throw new Error(t("ui.connecting"));
       await invoke("validate_terminal_target", { cwd, session });
-      await invoke("stop_terminal");
+      piRecovery?.pause();
+      try { await invoke("stop_terminal"); }
+      catch (error) { piRecovery?.monitor(); throw error; }
       terminalGeneration++;
       clearTimeout(startupPoll);
       connected = false;
@@ -1742,19 +2211,93 @@ async function main() {
       writeStored("pi.workspace", cwd);
     },
   });
+  agentRuntime = setupAgentRuntime({
+    desktop: isDesktop,
+    invoke,
+    workbench: () => workbench ? {
+      requireSwitch: forSubmission => workbench!.requireSwitch(forSubmission),
+      engineChanged: () => workbench!.engineChanged(),
+      setState: (value) => workbench!.setState(value),
+      setRuntime: (value) => workbench!.setRuntime(value),
+      runtimeId: () => workbench!.runtimeId(),
+      getState: () => workbench!.getState(),
+      refreshStrings: () => workbench!.refreshStrings(),
+      observeEvent: value => workbench!.observeEvent(value),
+    } : undefined,
+    cwd: () => lastTarget.cwd || readStored("pi.workspace") || "",
+    stopPi: async () => {
+      piRecovery?.pause();
+      terminalGeneration++;
+      connecting = false;
+      connected = false;
+      await bridgeInvoke("stop_terminal", { force: true });
+      workbench?.disconnected();
+    },
+    piConnecting: () => connecting,
+    connectPi: async (cwd, session) => {
+      await connect(cwd, session);
+      if (!connected) throw Error(t("ui.connectionFailed"));
+    },
+    changed: () => { refreshConnectionStatus(); },
+    status: updateRuntime,
+    toast: showToast,
+  });
+  piRecovery = createPiRecovery({
+    probe: () => bridgeInvoke("gui_status"),
+    confirm: () => confirmPiRecovery(t, currentLang === "en"),
+    invalidate: () => {
+      terminalGeneration++; clearTimeout(startupPoll); connected = false; connecting = false; libraryLoadedFor = "";
+      workbench?.disconnected();
+    },
+    stop: () => bridgeInvoke("stop_terminal", {force:true}),
+    start: async () => {
+      outputBatcher.dispose(); outputBatcher = createOutputBatcher((bytes, done) => term.write(bytes, done));
+      term.reset();
+      await connect(lastTarget.cwd || readStored("pi.workspace") || undefined, lastTarget.session);
+      if (!connected) throw Error(document.getElementById("connection-error-text")!.textContent || t("ui.connectionFailed"));
+    },
+    stalled: (error) => {
+      setConnection("ui.connectionFailed", "error");
+      document.getElementById("connection-error-text")!.textContent = formatUserError(error, t("ui.connectionFailed"));
+      retryConnection.textContent = currentLang === "en" ? "Restart Pi" : "重启 Pi";
+      connectionError.hidden = false; workbench?.disconnected();
+    },
+    recovered: () => {
+      if (connecting) return;
+      connected = true;
+      connectionError.hidden = true; setConnection("ui.connected", "connected");
+      void workbench?.synchronize().catch(() => {});
+      if (!document.getElementById("pane-skills")!.hidden) void skillLibrary?.open();
+    },
+  });
   const previousLanguageChange = onLanguageChange;
-  onLanguageChange = () => { previousLanguageChange?.(); workbench?.refreshStrings(); };
+  onLanguageChange = () => { previousLanguageChange?.(); workbench?.refreshStrings(); thinkingControls?.refreshLanguage(); agentSessionStrip.refreshLanguage(); personaSettings?.refreshLanguage(); };
   if (isDesktop) {
     void bridgeInvoke<{ cwd: string; executable: string }>("get_runtime_info")
       .then(updateRuntime).catch(() => {});
-    void connect(readStored("pi.workspace") || undefined);
+    void skillLibrary.preload();
+    void (async () => {
+      const workspace = readStored("pi.workspace") || undefined;
+      if (await agentRuntime?.restoreStoredEngine()) return;
+      try {
+        const targets = readResumeTargets(localStorage.getItem(RESUME_KEY));
+        const target = workspace ? targets.find(row => row.cwd === workspace) : targets[0];
+        if (target) {
+          await bridgeInvoke("validate_terminal_target", { cwd: target.cwd, session: target.session });
+          if (await confirmSessionResume(t, currentLang === "en", target.cwd, target.updatedAt)) {
+            await connect(target.cwd, target.session); return;
+          }
+        }
+      } catch (error) { showToast(formatUserError(error), 7000); }
+      await connect(workspace);
+    })();
   } else {
     document.getElementById("terminal-welcome")!.hidden = false;
     document.getElementById("runtime-executable")!.textContent = t("ui.notAvailable");
     refreshConnectionStatus();
   }
   retryConnection.addEventListener("click", () => {
-    void connect(lastTarget.cwd || readStored("pi.workspace") || undefined, lastTarget.session);
+    void piRecovery?.restart().catch((error) => showToast(formatUserError(error)));
   });
   document.getElementById("scroll-bottom")!.addEventListener("click", () => {
     term.scrollToBottom();
@@ -1771,9 +2314,10 @@ async function main() {
     const filename = `pi-terminal-${new Date().toISOString().replace(/[:.]/g, "-")}.txt`;
     if (isDesktop) {
       try {
-        const path = await invoke<string>("export_terminal_log", { text, filename });
-        showToast(`${currentLang === "en" ? "Saved" : "已保存"}: ${path}`, 5000);
-      } catch (error) { showToast(String(error), 5000); }
+        const exportedPath = await invoke<string>("export_terminal_log", { text, filename });
+        const displayName = typeof exportedPath === "string" ? exportedPath.split(/[\\/]/).pop() || exportedPath : "";
+        showToast(`${currentLang === "en" ? "Saved" : "已保存"}: ${displayName || (currentLang === "en" ? "Downloads folder" : "下载目录")}`, 5000);
+      } catch (error) { showToast(formatUserError(error), 5000); }
       return;
     }
     const url = URL.createObjectURL(new Blob([text], { type: "text/plain;charset=utf-8" }));
@@ -1786,7 +2330,7 @@ async function main() {
   document.getElementById("export-terminal")!.addEventListener("click", () => { void exportTerminal(); });
   document.getElementById("floating-settings")!.addEventListener("click", () => openSettings());
   document.addEventListener("keydown", (event) => {
-    if (document.querySelector(".model-dialog-backdrop")) return;
+    if (document.querySelector(".model-dialog-backdrop, .claude-view-modal, .permission-request-backdrop")) return;
     if (document.body.dataset.keyRecording) return;
     if (keybinds?.matches("gui.settings", event)) {
       event.preventDefault();
@@ -1815,18 +2359,32 @@ async function main() {
     }
   }, true);
   window.addEventListener("beforeunload", () => {
+    settingsNavigation.dispose();
     clearTimeout(resizeTimer);
     clearTimeout(startupPoll);
     workbench?.dispose();
+    agentSessionStrip.dispose();
+    conversationView?.dispose();
+    conversationListeners.forEach((unlisten) => unlisten());
     sounds?.dispose();
+    piPermissions.dispose();
+    permissionDialog.dispose();
     keybinds?.dispose();
     librarySettings?.dispose();
     agentMarket?.dispose();
+    skillLibrary?.dispose();
+    thinkingControls?.dispose();
+    piRecovery?.dispose();
+    harnessSettings?.dispose();
+    usageSettings?.dispose();
+    systemSettings?.dispose();
+    agentRuntime?.dispose();
     modelBulk?.dispose();
     document.removeEventListener("keydown", nativeCommandKey, true);
     cancelAnimationFrame(initialFitFrame);
     initialFitTimers.forEach(clearTimeout);
     outputBatcher.dispose();
+    sendModeControls.dispose();
     renderer.dispose();
     clearTimeout(toastTimer);
     clearTimeout(fullscreenTimer);
@@ -1845,6 +2403,6 @@ main().catch((error) => {
   console.error(error);
   const panel = document.getElementById("connection-error")!;
   panel.hidden = false;
-  document.getElementById("connection-error-text")!.textContent = String(error);
+  document.getElementById("connection-error-text")!.textContent = formatUserError(error, "应用启动失败");
   document.getElementById("retry-connection")!.addEventListener("click", () => location.reload(), { once: true });
 });

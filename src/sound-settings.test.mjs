@@ -50,9 +50,9 @@ function fixture(options={}) {
     close(){controller.dispose();window.happyDOM.abort();Object.assign(globalThis,old);}};
 }
 
-test("sound settings are confined to appearance and keep the agreed composer layout", async () => {
+test("sound settings have a dedicated page and keep the agreed composer layout", async () => {
   const f=fixture();await f.controller.ready;
-  assert.equal(f.el("sound-switch").closest(".settings-pane").id,"pane-appearance");
+  assert.equal(f.el("sound-switch").closest(".settings-pane").id,"pane-sounds");
   assert.equal(f.el("composer").nextElementSibling.id,"input-tools");
   assert.equal(f.el("model-open").closest(".input-tools").id,"input-tools");
   assert.equal(f.el("sound-pack").value,"builtin-soft");
@@ -98,7 +98,7 @@ test("trusted button clicks retain their action while synthetic, disabled and hi
   const played=f.calls.filter(([name]) => name==="play").length;
   assert.equal(played,1);
   f.el("frame-toggle").click();f.trusted("composer-send");
-  f.el("settings-panel").hidden=false;f.el("pane-appearance").hidden=false;
+  f.el("settings-panel").hidden=false;f.el("pane-sounds").hidden=false;
   f.trusted("sound-switch");
   assert.equal(f.calls.filter(([name]) => name==="play").length,played);
   assert.equal(actions,2);
@@ -206,6 +206,40 @@ test("trusted typing uses its own switch and keeps IME input uncancelled", async
   assert.equal(f.calls.filter(([name])=>name==="play").length,count);
   assert.equal(f.window.localStorage.getItem("pi.soundTyping"),"0");
   f.close();
+});
+test("typing fallback covers WebView input and native key events", async () => {
+  const f=fixture();await f.controller.ready;
+  const trusted=(event) => Object.defineProperty(event,"isTrusted",{value:true});
+  const key=new f.window.KeyboardEvent("keydown",{key:"a",bubbles:true});
+  trusted(key);f.el("composer-input").dispatchEvent(key);
+  assert.deepEqual(f.calls.at(-1),["play","typing"]);
+  f.close();
+});
+test("first keystroke sounds immediately and beforeinput only suppresses its matching input", async t => {
+  let clock = 0;
+  t.mock.method(performance, "now", () => clock);
+  const f = fixture();
+  try {
+    await f.controller.ready;
+    const dispatch = type => {
+      const event = new f.window.InputEvent(type, { inputType: "insertText", data: "a", bubbles: true });
+      Object.defineProperty(event, "isTrusted", { value: true });
+      f.el("composer-input").dispatchEvent(event);
+    };
+    const count = () => f.calls.filter(([name, event]) => name === "play" && event === "typing").length;
+    dispatch("beforeinput");
+    assert.equal(count(), 1);
+    clock = 1;
+    dispatch("input");
+    assert.equal(count(), 1);
+    clock = 60;
+    dispatch("input");
+    assert.equal(count(), 2);
+    f.controller.dispose();
+    clock = 120;
+    dispatch("input");
+    assert.equal(count(), 2);
+  } finally { f.close(); }
 });
 test("wheel sounds do not cancel scrolling, react to output, or run after the scroll switch is off", async () => {
   const f=fixture();await f.controller.ready;

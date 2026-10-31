@@ -40,6 +40,35 @@ function panel(title: string, t: Translate) {
     destroy() { backdrop.removeEventListener("keydown", keydown); backdrop.remove(); if (previous?.isConnected) previous.focus(); } };
 }
 
+export function confirmPiRecovery(t: Translate, english: boolean): Promise<boolean> {
+  return new Promise((resolve) => {
+    const ui = panel(english ? "Restart this Pi process?" : "重启当前窗口的 Pi？", t);
+    const note = document.createElement("p"); note.className = "settings-hint";
+    note.textContent = english ? "Only this window's Pi process will be stopped. Any running task is interrupted; the GUI draft and saved model configuration are retained. The saved session will be resumed when available." : "只停止此窗口的 Pi 进程；进行中的任务会中断。输入草稿和已保存的模型配置保留，并尽量恢复当前已保存会话。";
+    ui.body.append(note);
+    const restart = document.createElement("button"); restart.type = "button"; restart.className = "primary-button"; restart.textContent = english ? "Restart Pi" : "重启 Pi"; ui.footer.append(restart);
+    let settled = false;
+    const finish = (allowed: boolean) => { if (settled) return; settled = true; ui.destroy(); resolve(allowed); };
+    ui.cancelWith(() => finish(false)); restart.addEventListener("click", () => finish(true));
+  });
+}
+
+export function confirmSessionResume(t: Translate, english: boolean, cwd: string, updatedAt: number): Promise<boolean> {
+  return new Promise(resolve => {
+    const ui = panel(english ? "Resume saved session?" : "恢复上次会话？", t);
+    const detail = document.createElement("p"); detail.textContent = cwd;
+    const date = document.createElement("small"); date.textContent = new Date(updatedAt).toLocaleString();
+    ui.body.append(detail, date);
+    ui.cancel.textContent = english ? "New session" : "新建会话";
+    const restore = document.createElement("button"); restore.type = "button"; restore.className = "primary-button";
+    restore.textContent = english ? "Resume session" : "恢复会话";
+    ui.footer.append(restore);
+    let settled = false;
+    const finish = (result: boolean) => { if (settled) return; settled = true; ui.destroy(); resolve(result); };
+    ui.cancelWith(() => finish(false)); restore.addEventListener("click", () => finish(true));
+  });
+}
+
 export function confirmModelRemoval(name: string, value: string, t: Translate): Promise<boolean> {
   return new Promise((resolve) => {
     const ui = panel(t("ui.deleteModel"), t);

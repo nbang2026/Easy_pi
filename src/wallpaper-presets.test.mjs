@@ -46,10 +46,10 @@ test("presets preserve native playback, selection and custom wallpaper restorati
   assert.match(main,/if \(wallpaperSelectionVersion !== 0\) return/);
   assert.doesNotMatch(main,/requestVideoFrameCallback|wallpaperVideo\.load\(/);
 });
-test("relay has only URL, secret and models, and typography remains visible without wallpaper", () => {
+test("provider manager keeps connection settings separate from model entries", () => {
   const html=readFileSync(new URL("../index.html",import.meta.url),"utf8");
-  assert.doesNotMatch(html,/id="relay-name"/);
-  for (const id of ["relay-baseurl","relay-apikey","relay-models"]) assert.match(html,new RegExp(`id="${id}"`));
+  for (const id of ["provider-search","provider-list","provider-apikey","provider-baseurl","provider-api","provider-save-btn","models-select-all","models-remove-selected","models-restore","model-add-id"]) assert.match(html,new RegExp(`id="${id}"`));
+  for (const id of ["relay-baseurl","relay-apikey","relay-models"]) assert.doesNotMatch(html,new RegExp(`id="${id}"`));
   const type=html.match(/<button id="wallpaper-type"[^>]+>/)[0];
   assert.doesNotMatch(type,/immersive-only/);
   assert.match(html,/id="sidebar-recents"[^>]*open/);

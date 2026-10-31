@@ -1,0 +1,23 @@
+{
+  "name": "easy-pi-claude-runtime",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.19.0"
+  },
+  "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "0.3.301",
+    "@deepseek-ai/dsh-sdk-client": "0.2.1-alpha.5",
+    "@deepseek-ai/dsh": "0.2.1-alpha.5",
+    "@deepseek-ai/dsh-llm-pi-ai": "0.2.1-alpha.5",
+    "@deepseek-ai/dsh-user-approval": "0.2.1-alpha.5",
+    "@deepseek-ai/dsh-skill": "0.2.1-alpha.5",
+    "@deepseek-ai/dsh-skill-filesystem": "0.2.1-alpha.5",
+    "@deepseek-ai/dsh-tool-skill": "0.2.1-alpha.5",
+    "@deepseek-ai/dsh-subagent": "0.2.1-alpha.5",
+    "@deepseek-ai/dsh-subagent-spawn-in-process": "0.2.1-alpha.5",
+    "@deepseek-ai/dsh-tool-subagent": "0.2.1-alpha.5",
+    "@deepseek-ai/dsh-tool-subagent-control": "0.2.1-alpha.5"
+  }
+}

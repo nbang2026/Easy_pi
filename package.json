@@ -1,23 +1,16 @@
 {
   "name": "pi-app",
   "private": true,
-  "version": "1.0.3",
-  "description": "A Tauri desktop workbench for the Pi coding agent with graphical controls and a full terminal interface.",
-  "license": "MIT",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/nbang2026/Easy_pi.git"
-  },
-  "homepage": "https://github.com/nbang2026/Easy_pi#readme",
-  "bugs": {
-    "url": "https://github.com/nbang2026/Easy_pi/issues"
-  },
+  "version": "1.1.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "check": "tsc --noEmit",
     "test": "node scripts/test.mjs",
     "verify": "node scripts/verify.mjs",
+    "eval:harness": "node scripts/harness-eval.mjs",
+    "release:check": "node scripts/release-gate.mjs",
+    "release:manifest": "node --experimental-strip-types scripts/release-manifest.mjs",
     "windows-runtime:check": "node scripts/prepare-windows-runtime.mjs --check",
     "windows-runtime:prepare": "node scripts/prepare-windows-runtime.mjs",
     "build": "tsc --noEmit && vite build",

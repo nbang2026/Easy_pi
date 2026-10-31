@@ -135,13 +135,79 @@ fn row(provider: &str, model: &Value, source: &str) -> Value {
 }
 
 pub(crate) fn list(dir: &Path) -> Result<Value, String> {
-    let (models, _, _, state) = merged(dir)?;
+    let (models, catalog, custom, state) = merged(dir)?;
     let settings = read(&dir.join("settings.json"))?;
+    let auth = read(&dir.join("auth.json"))?;
     let provider = settings["defaultProvider"].as_str().unwrap_or_default();
     let id = settings["defaultModel"].as_str().unwrap_or_default();
     let current = if provider.is_empty() || id.is_empty() { String::new() } else { format!("{provider}/{id}") };
-    let items: Vec<_> = models.into_iter().filter(|((p, id), _)| !removed(&state, p, id)).map(|(_, value)| value).collect();
-    Ok(json!({"models":items,"current":current,"removedCount":state.get("removed").and_then(Value::as_array).map_or(0, Vec::len)}))
+    let visible: BTreeMap<_, _> = models.into_iter().filter(|((p, id), _)| !removed(&state, p, id)).collect();
+    let items: Vec<_> = visible.values().cloned().collect();
+    let mut provider_ids = std::collections::BTreeSet::new();
+    if let Some(entries) = custom.get("providers").and_then(Value::as_object) {
+        provider_ids.extend(entries.keys().cloned());
+    }
+    if let Some(entries) = catalog.as_object() {
+        provider_ids.extend(entries.keys().cloned());
+    }
+    provider_ids.extend(visible.keys().map(|(name, _)| name.clone()));
+    let providers: Vec<_> = provider_ids.into_iter().map(|name| {
+        let custom_entry = &custom["providers"][&name];
+        let catalog_entry = &catalog[&name];
+        json!({
+            "id": name,
+            "api": custom_entry["api"].as_str().or(catalog_entry["api"].as_str()).unwrap_or("openai-completions"),
+            "baseurl": custom_entry["baseUrl"].as_str().or(catalog_entry["baseUrl"].as_str()).unwrap_or_default(),
+            "hasKey": custom_entry["apiKey"].as_str().is_some_and(|key| !key.is_empty()) || auth.get(&name).is_some(),
+            "modelCount": visible.keys().filter(|(provider, _)| provider == &name).count()
+        })
+    }).collect();
+    Ok(json!({"models":items,"providers":providers,"current":current,"removedCount":state.get("removed").and_then(Value::as_array).map_or(0, Vec::len)}))
+}
+
+fn validate_baseurl(baseurl: &str) -> Result<(), String> {
+    if baseurl.is_empty() { return Ok(()); }
+    let rest = baseurl.strip_prefix("https://").or_else(|| baseurl.strip_prefix("http://"))
+        .ok_or("Base URL must use HTTP or HTTPS.")?;
+    let authority = rest.split(['/', '?', '#']).next().unwrap_or_default();
+    if authority.is_empty() || authority.contains('@') || baseurl.chars().any(char::is_whitespace) {
+        return Err("Base URL must contain a host and must not include credentials.".into());
+    }
+    Ok(())
+}
+
+/// Save provider-level connection settings without ever returning a stored key to the webview.
+pub(crate) fn save_provider(dir: &Path, provider: &str, api: &str, baseurl: &str, apikey: &str) -> Result<(), String> {
+    identifier(provider, "provider")?;
+    if provider.chars().any(char::is_whitespace) { return Err("Provider ID must not contain whitespace.".into()); }
+    if api.trim().is_empty() || api.len() > 120 || api.chars().any(char::is_control) {
+        return Err("API protocol is invalid.".into());
+    }
+    validate_baseurl(baseurl.trim())?;
+    let expected = snapshot(dir)?;
+    let mut custom = read(&dir.join("models.json"))?;
+    let root = custom.as_object_mut().ok_or("Invalid models.json")?;
+    root.entry("$schema").or_insert_with(|| json!("https://pi.dev/schemas/models.schema.json"));
+    let providers = root.entry("providers").or_insert_with(|| json!({})).as_object_mut().ok_or("Invalid providers object")?;
+    let entry = providers.entry(provider).or_insert_with(|| json!({"models": []})).as_object_mut().ok_or("Invalid provider configuration")?;
+    entry.insert("api".into(), json!(api.trim()));
+    if baseurl.trim().is_empty() { entry.remove("baseUrl"); }
+    else { entry.insert("baseUrl".into(), json!(baseurl.trim())); }
+    if !apikey.trim().is_empty() { entry.insert("apiKey".into(), json!(apikey.trim())); }
+    if !entry.contains_key("models") { entry.insert("models".into(), json!([])); }
+    commit(vec![(dir.join("models.json"), custom)], &expected)
+}
+
+pub(crate) fn create_provider(dir: &Path, provider: &str, api: &str) -> Result<(), String> {
+    identifier(provider, "provider")?;
+    if provider.chars().any(char::is_whitespace) { return Err("Provider ID must not contain whitespace.".into()); }
+    let custom = read(&dir.join("models.json"))?;
+    let catalog = read(&dir.join("models-store.json"))?;
+    let auth = read(&dir.join("auth.json"))?;
+    if custom["providers"].get(provider).is_some() || catalog.get(provider).is_some() || auth.get(provider).is_some() {
+        return Err("Provider already exists. Select it from the provider list instead.".into());
+    }
+    save_provider(dir, provider, api, "", "")
 }
 
 fn remove_from(root: &mut Value, provider: &str, id: &str, custom: bool) -> Result<bool, String> {
@@ -271,8 +337,9 @@ pub(crate) fn edit_info(dir: &Path, provider: &str, id: &str) -> Result<Value, S
     let source = &catalog[provider];
     let api = model["api"].as_str().or(config["api"].as_str()).or(source["api"].as_str()).unwrap_or("openai-completions");
     let baseurl = model["baseUrl"].as_str().or(config["baseUrl"].as_str()).or(source["baseUrl"].as_str()).unwrap_or_default();
+    let name = config["modelOverrides"][id]["name"].as_str().or(model["name"].as_str()).unwrap_or(id);
     // Never send stored credentials back to the webview. Blank means preserve.
-    Ok(json!({"provider":provider,"id":id,"name":model["name"].as_str().unwrap_or(id),"api":api,"baseurl":baseurl,"hasKey":config.get("apiKey").is_some()}))
+    Ok(json!({"provider":provider,"id":id,"name":name,"api":api,"baseurl":baseurl,"hasKey":config.get("apiKey").is_some()}))
 }
 
 pub(crate) fn edit(dir: &Path, provider: &str, original: &str, id: &str, name: &str, api: &str, baseurl: &str, apikey: &str) -> Result<(), String> {
@@ -326,6 +393,20 @@ mod tests {
         super::super::atomic_write(&dir.join("models-store.json"), br#"{"deepseek":{"etag":"unchanged","models":[{"id":"legacy","name":"Old model","api":"openai-completions","contextWindow":65536,"maxTokens":8192},{"id":"stay","name":"Keep"}]}}"#).unwrap();
         super::super::atomic_write(&dir.join("models.json"), br#"{"providers":{"relay":{"apiKey":"private-key","models":[{"id":"new-model","name":"New model"}]}}}"#).unwrap();
         dir
+    }
+    #[test]
+    fn editing_uses_effective_name_and_preserves_existing_override() {
+        let dir = fixture();
+        let mut custom = read(&dir.join("models.json")).unwrap();
+        custom["providers"]["relay"]["modelOverrides"] = json!({"new-model":{"name":"My label"}});
+        super::super::atomic_write(&dir.join("models.json"), &serde_json::to_vec(&custom).unwrap()).unwrap();
+        let info = edit_info(&dir, "relay", "new-model").unwrap();
+        assert_eq!(info["name"], "My label");
+        edit(&dir, "relay", "new-model", "new-model", info["name"].as_str().unwrap(), "openai-completions", "", "").unwrap();
+        let stored = read(&dir.join("models.json")).unwrap();
+        assert_eq!(stored["providers"]["relay"]["modelOverrides"]["new-model"]["name"], "My label");
+        assert_eq!(stored["providers"]["relay"]["apiKey"], "private-key");
+        std::fs::remove_dir_all(dir).unwrap();
     }
     #[test]
     fn legacy_and_custom_models_both_have_edit_and_delete_actions() {
@@ -480,6 +561,80 @@ mod bulk_tests {
         restore(&dir).unwrap();assert_eq!(list(&dir).unwrap()["models"].as_array().unwrap().len(),3);
         assert_eq!(read(&dir.join("models-store.json")).unwrap()["legacy"]["etag"],"keep");
         assert_eq!(read(&dir.join("models.json")).unwrap()["providers"]["custom"]["apiKey"],"keep-key");
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+}
+
+#[cfg(test)]
+mod provider_tests {
+    use super::*;
+
+    #[test]
+    fn provider_listing_exposes_only_key_presence_and_counts_models() {
+        let dir = crate::tests::scratch();
+        super::super::atomic_write(&dir.join("models-store.json"), br#"{"openai":{"api":"openai-completions","models":[{"id":"gpt-x"}]}}"#).unwrap();
+        super::super::atomic_write(&dir.join("models.json"), br#"{"providers":{"relay":{"api":"openai-responses","baseUrl":"https://relay.example/v1","apiKey":"private-token","models":[{"id":"model-a"}]}}}"#).unwrap();
+        let value = list(&dir).unwrap();
+        let providers = value["providers"].as_array().unwrap();
+        let relay = providers.iter().find(|item| item["id"] == "relay").unwrap();
+        assert_eq!(relay["hasKey"], true);
+        assert_eq!(relay["modelCount"], 1);
+        assert_eq!(relay["baseurl"], "https://relay.example/v1");
+        assert!(!value.to_string().contains("private-token"));
+        assert!(providers.iter().any(|item| item["id"] == "openai"));
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn provider_listing_includes_catalog_services_without_credentials_for_configuration() {
+        let dir = crate::tests::scratch();
+        super::super::atomic_write(&dir.join("models-store.json"), br#"{"configured-later":{"api":"openai-completions","baseUrl":"https://api.example/v1","models":[{"id":"catalog-model"}]}}"#).unwrap();
+        super::super::atomic_write(&dir.join("auth.json"), br#"{"another-provider":{}}"#).unwrap();
+        let value = list(&dir).unwrap();
+        let provider = value["providers"].as_array().unwrap().iter().find(|item| item["id"] == "configured-later").unwrap();
+        assert_eq!(provider["hasKey"], false);
+        assert_eq!(provider["modelCount"], 0);
+        assert_eq!(provider["baseurl"], "https://api.example/v1");
+        assert!(value["models"].as_array().unwrap().is_empty());
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn saving_provider_keeps_blank_key_and_rejects_credential_urls_atomically() {
+        let dir = crate::tests::scratch();
+        super::super::atomic_write(&dir.join("models.json"), br#"{"providers":{"relay":{"api":"openai-completions","baseUrl":"https://old.example","apiKey":"private-token","models":[{"id":"m"}]}}}"#).unwrap();
+        save_provider(&dir, "relay", "openai-responses", "https://new.example/v1", "").unwrap();
+        let saved = read(&dir.join("models.json")).unwrap();
+        assert_eq!(saved["providers"]["relay"]["apiKey"], "private-token");
+        assert_eq!(saved["providers"]["relay"]["api"], "openai-responses");
+        assert_eq!(saved["providers"]["relay"]["baseUrl"], "https://new.example/v1");
+        let before = std::fs::read(dir.join("models.json")).unwrap();
+        assert!(save_provider(&dir, "relay", "openai-responses", "https://user:secret@example.test", "").is_err());
+        assert_eq!(std::fs::read(dir.join("models.json")).unwrap(), before);
+        assert!(save_provider(&dir, "../bad", "openai-completions", "", "").is_err());
+        assert_eq!(std::fs::read(dir.join("models.json")).unwrap(), before);
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn saving_a_new_provider_creates_an_empty_model_collection() {
+        let dir = crate::tests::scratch();
+        save_provider(&dir, "new-provider", "anthropic-messages", "", "new-secret").unwrap();
+        let saved = read(&dir.join("models.json")).unwrap();
+        assert_eq!(saved["providers"]["new-provider"]["api"], "anthropic-messages");
+        assert_eq!(saved["providers"]["new-provider"]["apiKey"], "new-secret");
+        assert_eq!(saved["providers"]["new-provider"]["models"], json!([]));
+        assert!(!list(&dir).unwrap().to_string().contains("new-secret"));
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn creating_an_existing_provider_is_rejected_without_replacing_configuration() {
+        let dir = crate::tests::scratch();
+        let original = br#"{"providers":{"existing":{"api":"anthropic-messages","apiKey":"keep","models":[]}}}"#;
+        super::super::atomic_write(&dir.join("models.json"), original).unwrap();
+        assert!(create_provider(&dir, "existing", "openai-completions").is_err());
+        assert_eq!(std::fs::read(dir.join("models.json")).unwrap(), original);
         std::fs::remove_dir_all(dir).unwrap();
     }
 }

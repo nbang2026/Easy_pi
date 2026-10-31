@@ -6,10 +6,41 @@ import { join } from "node:path";
 import { agentDownloadUrl, createAgentLibrary, fetchAgentDefinition } from "../src-tauri/src/gui-library.mjs";
 
 const source="https://github.com/example/agents/blob/main/reviewer.md";
-async function fixture(fetcher=async()=>new Response("# Reviewer\nReview the user's changes.")) {
+async function fixture(fetcher=async()=>new Response("# Reviewer\nReview the user's changes."), options={}) {
   const directory=await mkdtemp(join(tmpdir(),"pi-library-test-"));
-  return {directory,library:createAgentLibrary({directory,fetcher}),close:()=>rm(directory,{recursive:true,force:true})};
+  return {directory,library:createAgentLibrary({directory,fetcher,canModelDownload:async()=>true,...options}),close:()=>rm(directory,{recursive:true,force:true})};
 }
+test("host task authorization is required and is rechecked after downloading", async () => {
+  let allowed=false, network=0, finish, started;
+  const waiting=new Promise(resolve=>{started=resolve;});
+  const f=await fixture(()=>{network++;started();return new Promise(resolve=>{finish=resolve;});},{canModelDownload:async()=>allowed});
+  try {
+    await assert.rejects(f.library.run({kind:"agent",action:"download",source},"model"),/授权/);
+    await assert.rejects(f.library.run({kind:"skills",action:"resolve",query:"frontend UI accessibility"},"model"),/放行/);
+    assert.equal(network,0);
+    allowed=true;
+    const result=f.library.run({kind:"agent",action:"download",source},"model");
+    await waiting; allowed=false; finish(new Response("# Reviewer"));
+    await assert.rejects(result,/撤销/);
+    assert.equal((await f.library.run({kind:"list"})).agents.length,0);
+  } finally {await f.close();}
+});
+test("project memories stay scoped, global notes remain shared and relevant notes outrank recent unrelated notes", async () => {
+  const f = await fixture();
+  try {
+    const one = await f.library.run({ kind: "memory", action: "save", title: "Build", content: "Use pnpm", workspace: "/one" }, "model");
+    const two = await f.library.run({ kind: "memory", action: "save", title: "Other", content: "Other project", workspace: "/two" }, "model");
+    await f.library.run({ kind: "memory", action: "save", title: "Language", content: "Chinese", scope: "global" });
+    const context = await f.library.run({ kind: "context", workspace: "/one", query: "pnpm", limit: 8 });
+    assert.equal(context.memories[0].id, one.id);
+    assert.ok(!context.memories.some(item => item.id === two.id));
+    assert.equal(context.memories.length, 2);
+    await assert.rejects(f.library.run({ kind: "memory", action: "read", id: two.id, workspace: "/one" }, "model"));
+    await assert.rejects(f.library.run({ kind: "memory", action: "save", id: two.id, title: "bad", content: "bad", workspace: "/one" }, "model"));
+    await assert.rejects(f.library.run({ kind: "memory", action: "save", id: one.id, title: "stale", content: "stale", workspace: "/one", expectedUpdatedAt: one.updatedAt - 1 }));
+    assert.equal((await f.library.run({ kind: "memory", action: "read", id: one.id })).content, "Use pnpm");
+  } finally { await f.close(); }
+});
 test("Agent downloads normalize GitHub files and reject executable, local, credentialed or redirected sources", async () => {
   assert.equal(agentDownloadUrl(source).href,"https://raw.githubusercontent.com/example/agents/main/reviewer.md");
   for(const url of ["http://github.com/e/a/blob/main/a.md","https://localhost/a.md","https://github.com/e/a","https://github.com/e/a/blob/main/a.ts","https://user:secret@github.com/e/a/blob/main/a.md","https://raw.githubusercontent.com.evil.test/a.md"])

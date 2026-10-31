@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { bracketedPaste, clampNumber, isHttpUrl, normalizeSendMode, parseLanguagePack, toReference } from "./utils.ts";
+import { bracketedPaste, clampNumber, formatUserError, isHttpUrl, normalizeSendMode, parseLanguagePack, toReference } from "./utils.ts";
 
 test("stored numbers are finite and clamped", () => {
   assert.equal(clampNumber("Infinity", 10, 28, 14), 14);
@@ -28,6 +28,19 @@ test("only HTTP URLs are accepted", () => {
   assert.equal(isHttpUrl("https://example.com/v1"), true);
   assert.equal(isHttpUrl("javascript:alert(1)"), false);
   assert.equal(isHttpUrl("not-a-url"), false);
+});
+test("user-facing errors are bounded and redact credentials and local paths", () => {
+  const message = formatUserError(new Error(
+    'Request failed: apiKey="sk-ant-abcdefghijklmnop" Bearer ghp_abcdefghijklmnop https://user:pass@example.test /Users/alice/Private/file.txt /var/folders/aa/bb/file',
+  ));
+  assert.match(message, /\[redacted\]/);
+  assert.doesNotMatch(message, /sk-ant-|ghp_|user:pass|\/Users\/alice|\/var\/folders\/aa/);
+  assert.doesNotMatch(message, /[\r\n]/);
+  assert.ok(message.length <= 800);
+});
+test("empty unknown errors use a stable fallback", () => {
+  assert.equal(formatUserError({}), "操作失败");
+  assert.equal(formatUserError("", "Fallback"), "Fallback");
 });
 test("language packs accept strings and reject malformed structures", () => {
   assert.equal(parseLanguagePack('{"code":"en-US","strings":{"a":"A"}}').code, "en-us");

@@ -1,0 +1,16 @@
+{
+  "schema": 1,
+  "product": "easy_pi",
+  "criteria": {
+    "security": { "status": "pending", "evidence": [] },
+    "stability": { "status": "pending", "evidence": [] },
+    "experience": { "status": "pending", "evidence": [] },
+    "features": { "status": "pending", "evidence": [] },
+    "installation": { "status": "pending", "evidence": [] },
+    "engineering": { "status": "pending", "evidence": [] }
+  },
+  "platforms": {
+    "macOS": { "desktop": "pending", "install": "pending", "publisherSignature": "pending" },
+    "Windows": { "desktop": "pending", "install": "pending", "publisherSignature": "pending" }
+  }
+}

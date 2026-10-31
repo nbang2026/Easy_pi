@@ -1,0 +1,22 @@
+.permission-request-backdrop {
+  position: fixed; inset: 0; z-index: 1000; display: grid; place-items: center;
+  padding: 20px; background: #17221d66; backdrop-filter: blur(2px);
+}
+.permission-request-dialog {
+  width: min(480px, calc(100vw - 32px)); padding: 22px; border: 1px solid #cddbd3;
+  border-radius: 8px; background: var(--surface, #fff); color: var(--text, #27312f);
+  max-height: calc(100dvh - 40px); overflow-y: auto;
+  box-shadow: 0 18px 60px #17221d38;
+}
+.permission-request-dialog h2 { margin: 0 0 14px; font-size: 18px; }
+.permission-request-body { color: #64716c; font-size: 13px; line-height: 1.6; }
+.permission-request-body p { margin: 8px 0; }
+.permission-request-operation { padding: 9px 10px; border: 1px solid #d9e5de; border-radius: 6px; background: #f5f9f6; color: #3c5148; overflow-wrap: anywhere; white-space: pre-wrap; max-height: 35dvh; overflow-y: auto; }
+.permission-request-risk { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: 600; vertical-align: middle; }
+.risk-low { background: #e6f5eb; color: #28744d; }
+.risk-medium { background: #fff3d8; color: #8b641b; }
+.risk-high { background: #ffe3e1; color: #a23731; }
+.permission-request-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; margin-top: 20px; }
+html[data-theme="dark"] .permission-request-dialog { background: #202824; color: #e2ebe6; border-color: #405249; }
+html[data-theme="dark"] .permission-request-body { color: #adbbb4; }
+html[data-theme="dark"] .permission-request-operation { background: #293630; border-color: #405249; color: #d1ded6; }

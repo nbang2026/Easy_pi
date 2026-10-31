@@ -62,6 +62,29 @@ test("Windows source retains runtime configuration but automatic installer packa
   assert.match(ci, /package-source/); assert.doesNotMatch(ci, /tauri build|--bundles|verify-windows-installer/);
 });
 
+test("Windows desktop builds stage and verify both platform runtimes", async () => {
+  const config = JSON.parse(await readFile(new URL("../src-tauri/tauri.windows.release.conf.json", import.meta.url), "utf8"));
+  assert.equal(config.bundle.resources["runtime/windows-x64"], "runtime/windows-x64");
+  assert.equal(config.bundle.resources["claude-runtime"], "claude-runtime");
+  assert.match(config.build.beforeBuildCommand, /prepare-windows-runtime\.mjs --check/);
+  assert.match(config.build.beforeBuildCommand, /prepare-claude-runtime\.mjs --platform win32 --arch x64 --check/);
+
+  const script = await readFile(new URL("./build-desktop-windows.ps1", import.meta.url), "utf8");
+  assert.match(script, /"bun"/);
+  assert.match(script, /bun.*install.*--frozen-lockfile/);
+  assert.match(script, /prepare-claude-runtime\.mjs.*"win32".*"x64"/);
+  assert.match(script, /prepare-claude-runtime\.mjs.*"--check"/);
+  assert.match(script, /PI_GUI_SMOKE_PROJECT_TRUST/);
+  assert.match(script, /@\("deny", "allow"\)/);
+
+  const workflow = await readFile(new URL("../.github/workflows/desktop.yml", import.meta.url), "utf8");
+  assert.match(workflow, /oven-sh\/setup-bun@v2/);
+  const installer = await readFile(new URL("./verify-windows-installer.ps1", import.meta.url), "utf8");
+  assert.match(installer, /prepare-claude-runtime\.mjs/);
+  assert.match(installer, /PI_GUI_SMOKE_PROJECT_TRUST/);
+  assert.match(installer, /claude_staged_runtime_smoke/);
+});
+
 test("source delivery does not enable legacy installer verification", async () => {
   const ci = await readFile(new URL("../.github/workflows/windows.yml", import.meta.url), "utf8");
   assert.match(ci, /easy_pi-windows-source/);

@@ -8,10 +8,16 @@ const argument = process.argv.find((value) => value.startsWith("--report="));
 const reportPath = resolve(root, argument ? argument.slice("--report=".length) : "verification-report.json");
 const report = { checkedAt: new Date().toISOString(), passed: true, stages: [] };
 const stages = [
-  { name: "TypeScript", program: "pnpm", args: ["check"], cwd: root },
-  { name: "Frontend tests", program: "pnpm", args: ["test"], cwd: root },
-  { name: "Frontend build", program: "pnpm", args: ["build"], cwd: root },
-  { name: "Rust tests", program: "cargo", args: ["test", "--lib", ...(process.env.PI_GUI_SMOKE_EXECUTABLE ? ["--", "--include-ignored"] : [])], cwd: resolve(root, "src-tauri") },
+  { name: "TypeScript", program: process.execPath, args: [resolve(root, "node_modules/typescript/bin/tsc"), "--noEmit"], cwd: root },
+  { name: "Frontend tests", program: process.execPath, args: ["scripts/test.mjs"], cwd: root },
+  { name: "Harness scenarios", program: process.execPath, args: ["scripts/harness-eval.mjs"], cwd: root },
+  { name: "Frontend build", program: process.execPath, args: [resolve(root, "node_modules/vite/bin/vite.js"), "build"], cwd: root },
+  { name: "Rust tests", program: "cargo", args: ["test", "--lib"], cwd: resolve(root, "src-tauri") },
+  ...(process.env.PI_GUI_SMOKE_EXECUTABLE || process.env.PI_GUI_SMOKE_RUNTIME ? [{
+    name: "Native Pi transport", program: "cargo",
+    args: ["test", "--lib", "gui_bridge::tests::real_pi_launch_uses_the_app_transport", "--", "--ignored", "--exact"],
+    cwd: resolve(root, "src-tauri"),
+  }] : []),
 ];
 for (const stage of stages) {
   console.log(`\nChecking: ${stage.name}`);

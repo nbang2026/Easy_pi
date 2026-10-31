@@ -6,4 +6,6 @@ verification-report.json
 .DS_Store
 
 src-tauri/runtime/
-runtime-assets/
+
+/src-tauri/claude-runtime/
+/agent-runtime/node_modules/

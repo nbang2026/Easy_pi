@@ -25,8 +25,7 @@ fn scoped_path(root: &Path, relative: &str) -> Result<PathBuf, String> {
 }
 
 fn sessions_root() -> Result<PathBuf, String> {
-    let home = std::env::var("HOME").map_err(|e| e.to_string())?;
-    Ok(PathBuf::from(home).join(".pi/agent/sessions"))
+    Ok(crate::agent_config_directory()?.join("sessions"))
 }
 
 pub fn session_path(path: &str) -> Result<PathBuf, String> {
@@ -36,6 +35,19 @@ pub fn session_path(path: &str) -> Result<PathBuf, String> {
         return Err("会话文件必须来自 Pi 的会话目录。".into());
     }
     Ok(path)
+}
+
+pub(crate) fn validate_session_workspace(path: &Path, workspace: &Path) -> Result<(), String> {
+    let file = std::fs::File::open(path).map_err(|error| error.to_string())?;
+    let mut header = Vec::new();
+    BufReader::new(file).take(65537).read_until(b'\n', &mut header).map_err(|error| error.to_string())?;
+    if header.len() > 65536 { return Err("会话头部过大，原文件已保留。".into()); }
+    let value: Value = serde_json::from_slice(&header).map_err(|_| "会话头部损坏，原文件已保留。")?;
+    let origin = value["cwd"].as_str().ok_or("会话缺少工作区信息。")?;
+    if value["type"] != "session" || Path::new(origin).canonicalize().ok().as_deref() != Some(workspace) {
+        return Err("会话所属工作区与当前选择不一致；请从会话列表打开原工作区。".into());
+    }
+    Ok(())
 }
 
 #[tauri::command]
@@ -201,26 +213,73 @@ fn walk_files(root: &Path, directory: &Path, files: &mut Vec<String>, depth: usi
 }
 
 fn git(root: &Path, arguments: &[&str]) -> Result<Vec<u8>, String> {
-    let mut child = Command::new("git").arg("--no-pager").arg("--literal-pathspecs").arg("-c").arg("core.fsmonitor=false")
-        .arg("-C").arg(root).args(arguments).stdout(Stdio::piped()).stderr(Stdio::piped())
-        .spawn().map_err(|e| format!("Git 不可用: {e}"))?;
-    let stderr = child.stderr.take().unwrap();
-    let errors = std::thread::spawn(move || {
-        let mut output = Vec::new();
-        let _ = stderr.take(16384).read_to_end(&mut output);
-        output
-    });
-    let mut output = Vec::new();
-    child.stdout.take().unwrap().take(2 * 1024 * 1024 + 1).read_to_end(&mut output).map_err(|e| e.to_string())?;
-    if output.len() > 2 * 1024 * 1024 {
-        let _ = child.kill();
-        let _ = child.wait();
-        let _ = errors.join();
-        return Err("Git 输出超过 2 MB，请缩小审阅范围。".into());
+    let mut command = Command::new(super::git_executable());
+    clear_git_environment(&mut command);
+    #[cfg(test)]
+    {
+        // Tests use only their disposable repository, never the user's Git config.
+        command.env("GIT_CONFIG_GLOBAL", if cfg!(windows) { "NUL" } else { "/dev/null" })
+            .env("GIT_CONFIG_NOSYSTEM", "1");
     }
-    let status = child.wait().map_err(|e| e.to_string())?;
-    let error = errors.join().unwrap_or_default();
-    if status.success() { Ok(output) } else { Err(String::from_utf8_lossy(&error).trim().to_owned()) }
+    command.arg("--no-pager").arg("--literal-pathspecs").arg("-c").arg("core.fsmonitor=false")
+        .arg("-C").arg(root).args(arguments);
+    git_output(&mut command, std::time::Duration::from_secs(10))
+}
+
+fn clear_git_environment(command: &mut Command) {
+    // Preserve ordinary user configuration, but discard overrides injected by
+    // the GUI's launching process before choosing a repository or index.
+    let keys: Vec<_> = std::env::vars_os().map(|(key, _)| key)
+        .chain(command.get_envs().map(|(key, _)| key.to_os_string())).collect();
+    for key in keys {
+        if key.to_string_lossy().to_ascii_uppercase().starts_with("GIT_") { command.env_remove(key); }
+    }
+}
+
+fn git_output(command: &mut Command, timeout: std::time::Duration) -> Result<Vec<u8>, String> {
+    use std::sync::mpsc;
+    use std::time::{Duration, Instant};
+    let deadline = Instant::now() + timeout;
+    let mut child = command.stdout(Stdio::piped()).stderr(Stdio::piped())
+        .spawn().map_err(|e| format!("Git 不可用: {e}"))?;
+    let (sender, receiver) = mpsc::channel();
+    for (kind, stream, limit) in [
+        (true, Box::new(child.stdout.take().unwrap()) as Box<dyn Read + Send>, 2 * 1024 * 1024),
+        (false, Box::new(child.stderr.take().unwrap()) as Box<dyn Read + Send>, 16384),
+    ] {
+        let sender = sender.clone();
+        std::thread::spawn(move || {
+            let mut bytes = Vec::new();
+            let result = stream.take(limit + 1).read_to_end(&mut bytes).map(|_| bytes);
+            let _ = sender.send((kind, result, limit as usize));
+        });
+    }
+    drop(sender);
+    let result = (|| {
+        let mut output = None;
+        let mut errors = None;
+        let mut exit = None;
+        while Instant::now() < deadline {
+            while let Ok((stdout, bytes, limit)) = receiver.try_recv() {
+                let bytes = bytes.map_err(|e| e.to_string())?;
+                if bytes.len() > limit { return Err("Git 输出超过限制，请缩小审阅范围。".into()); }
+                if stdout { output = Some(bytes); } else { errors = Some(bytes); }
+            }
+            if exit.is_none() { exit = child.try_wait().map_err(|e| e.to_string())?; }
+            if let (Some(status), Some(output), Some(errors)) = (&exit, &output, &errors) {
+                return if status.success() { Ok(output.clone()) } else { Err(String::from_utf8_lossy(errors).trim().to_owned()) };
+            }
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        Err("Git 操作超时，已停止等待。请检查仓库后重试；写入操作可能已完成，请先刷新状态。".into())
+    })();
+    if result.is_err() {
+        let _ = child.kill();
+        // A descendant may keep an inherited pipe open. Reaping runs independently
+        // and pipe-reader threads are never joined on the caller's deadline.
+        std::thread::spawn(move || { let _ = child.wait(); });
+    }
+    result
 }
 
 #[tauri::command]
@@ -253,6 +312,40 @@ fn revision(text: &str) -> String {
     let mut hasher = std::collections::hash_map::DefaultHasher::new();
     text.hash(&mut hasher);
     format!("{:016x}", hasher.finish())
+}
+
+fn artifact_file(root: &Path, path: &str) -> Result<PathBuf, String> {
+        let root = root.canonicalize().map_err(|error| error.to_string())?;
+        let file = scoped_path(&root, path)?;
+        let relative = file.strip_prefix(&root).map_err(|_| "文件路径超出工作区。")?;
+        if relative.components().any(|part| {
+            let name = part.as_os_str().to_string_lossy().to_lowercase();
+            matches!(name.as_str(), ".git" | ".ssh" | ".aws" | ".azure" | ".gnupg" | ".codex" | ".pi" | ".claude" | ".npmrc" | ".netrc" | "credential" | "credentials" | "secret" | "secrets" | "id_rsa" | "id_ed25519")
+                || name == ".env" || name.starts_with(".env.") || name.starts_with("credential.") || name.starts_with("credentials.") || name.starts_with("secret.") || name.starts_with("secrets.")
+                || [".pem", ".key", ".p12", ".pfx"].iter().any(|suffix| name.ends_with(suffix))
+        }) || !file.is_file() { return Err("无法显示敏感文件或非文件路径。".into()); }
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::MetadataExt;
+            if std::fs::metadata(&file).map_err(|error| error.to_string())?.nlink() > 1 { return Err("无法显示具有外部硬链接的产物。".into()); }
+        }
+        Ok(file)
+}
+
+#[tauri::command]
+pub async fn reveal_workspace_file(root: String, path: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let file = artifact_file(&workspace_root(Some(&root))?, &path)?;
+        // Select the artifact without opening or executing its contents.
+        #[cfg(target_os = "macos")]
+        let result = Command::new("/usr/bin/open").arg("-R").arg(&file).status();
+        #[cfg(windows)]
+        let result = Command::new("explorer.exe").arg(format!("/select,{}", file.display())).status();
+        #[cfg(not(any(target_os = "macos", windows)))]
+        return Err("当前系统尚未提供文件定位。".into());
+        #[cfg(any(target_os = "macos", windows))]
+        if result.map_err(|error| error.to_string())?.success() { Ok(()) } else { Err("无法在文件管理器中定位产物。".into()) }
+    }).await.map_err(|error| error.to_string())?
 }
 
 #[tauri::command]
@@ -318,17 +411,86 @@ fn parse_branch_changes(bytes: &[u8]) -> Vec<Value> {
     changes
 }
 
+// Review paths stay repository-relative, even when the selected workspace is a subdirectory.
+struct GitWorkspace {
+    repository: PathBuf,
+    selected: PathBuf,
+}
+
+impl GitWorkspace {
+    fn new(root: &str) -> Result<Self, String> {
+        let selected = workspace_root(Some(root))?;
+        let bytes = git(&selected, &["rev-parse", "--show-toplevel"])?;
+        let path = std::str::from_utf8(&bytes).map_err(|e| e.to_string())?;
+        let path = path.strip_suffix('\n').unwrap_or(path);
+        let repository = PathBuf::from(path).canonicalize().map_err(|e| e.to_string())?;
+        if !selected.starts_with(&repository) { return Err("工作区不在 Git 仓库内。".into()); }
+        Ok(Self { repository, selected })
+    }
+
+    fn contains(&self, path: &str) -> bool {
+        validate_git_path(path).is_ok() && self.repository.join(path).starts_with(&self.selected)
+    }
+
+    fn path(&self, path: &str) -> Result<PathBuf, String> {
+        if !self.contains(path) { return Err("Git 文件路径超出工作区。".into()); }
+        let absolute = self.repository.join(path);
+        // A deletion may have no remaining parent directory. Check the nearest existing
+        // ancestor instead of requiring the file to exist, and still reject escaping links.
+        let mut ancestor = absolute.as_path();
+        loop {
+            match std::fs::symlink_metadata(ancestor) {
+                Ok(_) => {
+                    let resolved = ancestor.canonicalize().map_err(|e| e.to_string())?;
+                    if !resolved.starts_with(&self.selected) { return Err("链接指向工作区之外，无法访问。".into()); }
+                    return Ok(absolute);
+                },
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                    ancestor = ancestor.parent().ok_or("Git 文件路径无效。")?;
+                },
+                Err(error) => return Err(error.to_string()),
+            }
+        }
+    }
+
+    fn changes(&self, changes: Vec<Value>) -> Vec<Value> {
+        changes.into_iter().filter_map(|mut change| {
+            let inside = self.contains(change["path"].as_str()?);
+            let Some(old) = change["oldPath"].as_str() else { return inside.then_some(change) };
+            let old_inside = self.contains(old);
+            if inside && old_inside { return Some(change); }
+            if !inside && !old_inside { return None; }
+            if !inside {
+                // Copies leave the source unchanged. Renames out of the workspace
+                // expose only the source deletion; no command receives the outside path.
+                if change["index"] != "R" && change["worktree"] != "R" { return None; }
+                change["path"] = json!(old);
+            }
+            change["oldPath"] = Value::Null;
+            for field in ["index", "worktree"] {
+                if matches!(change[field].as_str(), Some("R" | "C")) {
+                    change[field] = json!(if inside { "A" } else { "D" });
+                } else if !inside {
+                    change[field] = json!(" ");
+                }
+            }
+            Some(change)
+        }).collect()
+    }
+}
+
 #[tauri::command]
 pub async fn git_changes(root: String, mode: Option<String>, base: Option<String>) -> Result<Value, String> {
     tauri::async_runtime::spawn_blocking(move || {
-        let root = workspace_root(Some(&root))?;
+        let workspace = GitWorkspace::new(&root)?;
+        let root = &workspace.repository;
         let changes = if mode.as_deref() == Some("branch") {
             parse_branch_changes(&git(&root, &["diff", "--no-ext-diff", "--no-textconv", "--name-status", "-z", &comparison_ref(base)?, "--"])?)
         } else { parse_status(&git(&root, &["status", "--porcelain=v1", "-z", "--untracked-files=all"])? ) };
         let branch = git(&root, &["branch", "--show-current"]).map(|bytes| String::from_utf8_lossy(&bytes).trim().to_owned()).unwrap_or_default();
         let refs = git(&root, &["for-each-ref", "--format=%(refname:short)", "refs/heads", "refs/remotes"])
             .map(|bytes| String::from_utf8_lossy(&bytes).lines().take(100).map(str::to_owned).collect::<Vec<_>>()).unwrap_or_default();
-        Ok(json!({"changes": changes, "branch": branch, "refs": refs}))
+        Ok(json!({"changes": workspace.changes(changes), "branch": branch, "refs": refs}))
     }).await.map_err(|e| e.to_string())?
 }
 
@@ -341,9 +503,11 @@ fn validate_git_path(path: &str) -> Result<(), String> {
 #[tauri::command]
 pub async fn git_diff(root: String, path: String, old_path: Option<String>, mode: String, base: Option<String>) -> Result<String, String> {
     tauri::async_runtime::spawn_blocking(move || {
-        let root = workspace_root(Some(&root))?;
-        validate_git_path(&path)?;
-        if mode == "untracked" { return read_text(&scoped_path(&root, &path)?); }
+        let workspace = GitWorkspace::new(&root)?;
+        let file = workspace.path(&path)?;
+        if let Some(ref old) = old_path { workspace.path(old)?; }
+        if mode == "untracked" { return read_text(&file); }
+        let root = &workspace.repository;
         let mut args = vec!["diff", "--no-ext-diff", "--no-textconv", "--no-color"];
         let comparison;
         match mode.as_str() {
@@ -356,7 +520,7 @@ pub async fn git_diff(root: String, path: String, old_path: Option<String>, mode
             _ => return Err("审阅模式无效。".into()),
         }
         args.extend(["--", &path]);
-        if let Some(ref old) = old_path { validate_git_path(old)?; args.push(old); }
+        if let Some(ref old) = old_path { args.push(old); }
         let bytes = git(&root, &args)?;
         Ok(String::from_utf8_lossy(&bytes).into_owned())
     }).await.map_err(|e| e.to_string())?
@@ -365,12 +529,14 @@ pub async fn git_diff(root: String, path: String, old_path: Option<String>, mode
 #[tauri::command]
 pub async fn git_stage(root: String, path: String, old_path: Option<String>, stage: bool) -> Result<(), String> {
     tauri::async_runtime::spawn_blocking(move || {
-        let root = workspace_root(Some(&root))?;
-        validate_git_path(&path)?;
+        let workspace = GitWorkspace::new(&root)?;
+        workspace.path(&path)?;
+        if let Some(ref old) = old_path { workspace.path(old)?; }
+        let root = &workspace.repository;
         let mut args = if stage { vec!["add", "--", &path] }
             else if git(&root, &["rev-parse", "--verify", "HEAD"]).is_ok() { vec!["restore", "--staged", "--", &path] }
             else { vec!["rm", "--cached", "--", &path] };
-        if let Some(ref old) = old_path { validate_git_path(old)?; args.push(old); }
+        if let Some(ref old) = old_path { args.push(old); }
         git(&root, &args)?;
         Ok(())
     }).await.map_err(|e| e.to_string())?
@@ -379,6 +545,73 @@ pub async fn git_stage(root: String, path: String, old_path: Option<String>, sta
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn artifact_selection_rejects_sensitive_missing_outside_and_linked_files() {
+        let repo = GitTestRepo::new();
+        repo.write("report.md", "result");
+        assert!(artifact_file(&repo.0, "report.md").is_ok());
+        for path in [".env", "secret.json", "private.pem"] {
+            repo.write(path, "private");
+            assert!(artifact_file(&repo.0, path).is_err());
+        }
+        for path in ["../outside", ".git", "missing.md"] { assert!(artifact_file(&repo.0, path).is_err()); }
+        #[cfg(unix)]
+        {
+            std::os::unix::fs::symlink(repo.0.join(".env"), repo.0.join("alias.md")).unwrap();
+            assert!(artifact_file(&repo.0, "alias.md").is_err());
+            std::fs::hard_link(repo.0.join(".env"), repo.0.join("hardlink.md")).unwrap();
+            assert!(artifact_file(&repo.0, "hardlink.md").is_err());
+        }
+    }
+    #[test]
+    fn git_environment_overrides_cannot_redirect_staging_into_another_project() {
+        let first = GitTestRepo::new();
+        let second = GitTestRepo::new();
+        first.write("A.txt", "A");
+        second.write("B.txt", "B");
+        git(&second.0, &["add", "--", "B.txt"]).unwrap();
+        let foreign_index = second.0.join(".git/index");
+        let before = std::fs::read(&foreign_index).unwrap();
+        let mut command = Command::new("git");
+        command.env("GIT_INDEX_FILE", &foreign_index)
+            .env("GIT_DIR", second.0.join(".git"))
+            .env("GIT_WORK_TREE", &second.0)
+            .env("GIT_CONFIG_COUNT", "1").env("GIT_CONFIG_KEY_0", "core.bare").env("GIT_CONFIG_VALUE_0", "true");
+        clear_git_environment(&mut command);
+        for (key, value) in command.get_envs() {
+            if key.to_string_lossy().starts_with("GIT_") { assert!(value.is_none(), "{key:?}"); }
+        }
+        command.env("GIT_CONFIG_GLOBAL", if cfg!(windows) { "NUL" } else { "/dev/null" }).env("GIT_CONFIG_NOSYSTEM", "1")
+            .args(["--no-pager", "--literal-pathspecs", "-c", "core.fsmonitor=false", "-C"])
+            .arg(&first.0).args(["add", "--", "A.txt"]);
+        git_output(&mut command, std::time::Duration::from_secs(5)).unwrap();
+        assert_eq!(std::fs::read(&foreign_index).unwrap(), before);
+        assert_eq!(git(&first.0, &["ls-files"]).unwrap(), b"A.txt\n");
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn git_timeout_does_not_wait_for_a_stalled_process_or_inherited_pipe() {
+        use std::time::{Duration, Instant};
+        for script in ["exec /bin/sleep 3", "/bin/sleep 3 & exit 0"] {
+            let started = Instant::now();
+            let error = git_output(Command::new("/bin/sh").arg("-c").arg(script), Duration::from_millis(80)).unwrap_err();
+            assert!(error.contains("超时"), "{error}");
+            assert!(started.elapsed() < Duration::from_secs(2));
+        }
+    }
+    #[test]
+    #[cfg(unix)]
+    fn git_output_bounds_both_streams_and_preserves_exit_errors() {
+        use std::time::Duration;
+        let timeout = Duration::from_secs(3);
+        let error = git_output(Command::new("/bin/sh").arg("-c").arg("printf problem >&2; exit 1"), timeout).unwrap_err();
+        assert_eq!(error, "problem");
+        let bytes = git_output(Command::new("/bin/sh").arg("-c").arg("printf result"), timeout).unwrap();
+        assert_eq!(bytes, b"result");
+        let error = git_output(Command::new("/bin/sh").arg("-c").arg("/usr/bin/head -c 20000 /dev/zero >&2"), timeout).unwrap_err();
+        assert!(error.contains("输出超过限制"), "{error}");
+    }
     #[test]
     #[cfg(unix)]
     fn scope_rejects_parent_absolute_and_symlink_escape() {
@@ -432,6 +665,257 @@ mod tests {
         assert!(comparison_ref(Some("main;cmd".into())).is_err());
         assert_eq!(comparison_ref(Some("origin/main".into())).unwrap(), "origin/main...HEAD");
     }
+    struct GitTestRepo(PathBuf);
+
+    impl GitTestRepo {
+        fn new() -> Self {
+            let repo = Self(super::super::tests::scratch());
+            git(&repo.0, &["init", "-q", "--initial-branch=main", "--template="]).unwrap();
+            std::fs::create_dir_all(repo.workspace()).unwrap();
+            repo
+        }
+
+        fn workspace(&self) -> PathBuf { self.0.join("selected workspace") }
+        fn root_arg(&self) -> String { self.workspace().to_string_lossy().into_owned() }
+        fn write(&self, path: &str, text: &str) {
+            let file = self.0.join(path);
+            std::fs::create_dir_all(file.parent().unwrap()).unwrap();
+            std::fs::write(file, text).unwrap();
+        }
+        fn commit(&self) {
+            git(&self.0, &["add", "--all"]).unwrap();
+            git(&self.0, &["-c", "user.name=Workbench Test", "-c", "user.email=workbench@example.invalid",
+                "-c", "commit.gpgsign=false", "commit", "-qm", "fixture"]).unwrap();
+        }
+        fn changes(&self, branch: bool) -> Value {
+            tauri::async_runtime::block_on(git_changes(self.root_arg(),
+                branch.then(|| "branch".into()), branch.then(|| "main".into()))).unwrap()
+        }
+        fn diff(&self, path: &str, old: Option<&str>, mode: &str) -> Result<String, String> {
+            tauri::async_runtime::block_on(git_diff(self.root_arg(), path.into(), old.map(str::to_owned),
+                mode.into(), (mode == "branch").then(|| "main".into())))
+        }
+        fn stage(&self, path: &str, old: Option<&str>, stage: bool) -> Result<(), String> {
+            tauri::async_runtime::block_on(git_stage(self.root_arg(), path.into(), old.map(str::to_owned), stage))
+        }
+        fn cached_paths(&self) -> Vec<String> {
+            git(&self.0, &["diff", "--cached", "--name-only", "-z"]).unwrap()
+                .split(|byte| *byte == 0).filter(|part| !part.is_empty())
+                .map(|part| String::from_utf8(part.to_vec()).unwrap()).collect()
+        }
+        fn outside_index(&self) -> Vec<u8> {
+            git(&self.0, &["ls-files", "--stage", "-z", "--", "outside.txt", "selected workspace sibling"]).unwrap()
+        }
+    }
+
+    impl Drop for GitTestRepo {
+        fn drop(&mut self) { let _ = std::fs::remove_dir_all(&self.0); }
+    }
+
+    #[test]
+    fn nested_git_diff_stage_and_unstage_use_literal_repository_paths() {
+        let repo = GitTestRepo::new();
+        let path = "selected workspace/src/[ab] note.txt";
+        let other = "selected workspace/src/a note.txt";
+        repo.write(path, "original literal\n");
+        repo.write(other, "original neighbor\n");
+        repo.write("outside.txt", "original outside\n");
+        repo.commit();
+        repo.write(path, "changed literal\n");
+        repo.write(other, "changed neighbor\n");
+        repo.write("outside.txt", "outside staged sentinel\n");
+        git(&repo.0, &["add", "--", "outside.txt"]).unwrap();
+        let outside = repo.outside_index();
+
+        let working = repo.diff(path, None, "working").unwrap();
+        assert!(working.contains("+changed literal"), "nested diff must address the status path: {working}");
+        assert!(!working.contains("changed neighbor"));
+        repo.stage(path, None, true).unwrap();
+        assert_eq!(repo.cached_paths(), vec!["outside.txt", path]);
+        assert!(repo.diff(path, None, "staged").unwrap().contains("+changed literal"));
+        assert!(repo.diff(path, None, "working").unwrap().is_empty());
+        repo.stage(path, None, false).unwrap();
+        assert_eq!(repo.cached_paths(), vec!["outside.txt"]);
+        assert!(repo.diff(path, None, "working").unwrap().contains("+changed literal"));
+        assert_eq!(repo.outside_index(), outside);
+        assert_eq!(std::fs::read_to_string(repo.0.join("outside.txt")).unwrap(), "outside staged sentinel\n");
+    }
+
+    #[test]
+    fn nested_git_untracked_preview_and_unborn_stage_round_trip() {
+        let repo = GitTestRepo::new();
+        let path = "selected workspace/new [ab] file.txt";
+        repo.write(path, "untracked literal contents\n");
+        repo.write("selected workspace/new a file.txt", "unrelated\n");
+        repo.write("outside.txt", "outside remains untracked\n");
+        let changes = repo.changes(false);
+        assert!(changes["changes"].as_array().unwrap().iter().any(|change| change["path"] == path && change["untracked"] == true));
+        assert_eq!(repo.diff(path, None, "untracked").unwrap(), "untracked literal contents\n");
+        repo.stage(path, None, true).unwrap();
+        assert_eq!(repo.cached_paths(), vec![path]);
+        repo.stage(path, None, false).unwrap();
+        assert!(repo.cached_paths().is_empty());
+        assert_eq!(repo.diff(path, None, "untracked").unwrap(), "untracked literal contents\n");
+        assert_eq!(std::fs::read_to_string(repo.0.join("outside.txt")).unwrap(), "outside remains untracked\n");
+    }
+
+    #[test]
+    fn nested_git_changes_filter_to_the_selected_workspace() {
+        let repo = GitTestRepo::new();
+        repo.write("selected workspace/inside file.txt", "before\n");
+        repo.write("selected workspace sibling/outside.txt", "before\n");
+        repo.write("outside.txt", "before\n");
+        repo.commit();
+        repo.write("selected workspace/inside file.txt", "after\n");
+        repo.write("selected workspace/new file.txt", "new\n");
+        repo.write("selected workspace sibling/outside.txt", "after\n");
+        repo.write("outside.txt", "after\n");
+        repo.write("outside new.txt", "new\n");
+        let value = repo.changes(false);
+        let paths: Vec<_> = value["changes"].as_array().unwrap().iter().map(|change| change["path"].as_str().unwrap()).collect();
+        assert_eq!(paths, vec!["selected workspace/inside file.txt", "selected workspace/new file.txt"]);
+        assert_eq!(value["branch"], "main");
+        assert!(value["refs"].as_array().unwrap().iter().any(|value| value == "main"));
+    }
+
+    #[test]
+    fn nested_git_rename_and_deleted_paths_round_trip_without_touching_outside() {
+        let repo = GitTestRepo::new();
+        let old = "selected workspace/old name.txt";
+        let new = "selected workspace/new name.txt";
+        let deleted = "selected workspace/deleted folder/deleted file.txt";
+        repo.write(old, "rename contents\n");
+        repo.write(deleted, "delete contents\n");
+        repo.write("outside.txt", "before\n");
+        repo.commit();
+        std::fs::rename(repo.0.join(old), repo.0.join(new)).unwrap();
+        std::fs::remove_dir_all(repo.0.join("selected workspace/deleted folder")).unwrap();
+        repo.write("outside.txt", "outside staged sentinel\n");
+        git(&repo.0, &["add", "--all"]).unwrap();
+        let outside = repo.outside_index();
+        let changes = repo.changes(false);
+        let rename = changes["changes"].as_array().unwrap().iter().find(|change| change["path"] == new).unwrap();
+        assert_eq!(rename["oldPath"], old);
+        assert!(repo.diff(new, Some(old), "staged").unwrap().contains("rename from selected workspace/old name.txt"));
+        assert!(repo.diff(deleted, None, "staged").unwrap().contains("-delete contents"));
+        repo.stage(new, Some(old), false).unwrap();
+        repo.stage(deleted, None, false).unwrap();
+        assert_eq!(repo.cached_paths(), vec!["outside.txt"]);
+        assert!(repo.diff(deleted, None, "working").unwrap().contains("-delete contents"));
+        repo.stage(new, Some(old), true).unwrap();
+        repo.stage(deleted, None, true).unwrap();
+        assert!(repo.diff(new, Some(old), "staged").unwrap().contains("rename to selected workspace/new name.txt"));
+        assert_eq!(repo.outside_index(), outside);
+        assert_eq!(std::fs::read_to_string(repo.0.join("outside.txt")).unwrap(), "outside staged sentinel\n");
+    }
+
+    #[test]
+    fn nested_git_branch_changes_and_diffs_keep_spaces_renames_and_deletions() {
+        let repo = GitTestRepo::new();
+        let old = "selected workspace/old branch name.txt";
+        let new = "selected workspace/new branch name.txt";
+        let deleted = "selected workspace/deleted branch file.txt";
+        repo.write(old, "branch rename contents\n");
+        repo.write(deleted, "branch delete contents\n");
+        repo.write("selected workspace/modified branch file.txt", "before\n");
+        repo.write("outside.txt", "before\n");
+        repo.commit();
+        git(&repo.0, &["checkout", "-qb", "feature"]).unwrap();
+        std::fs::rename(repo.0.join(old), repo.0.join(new)).unwrap();
+        std::fs::remove_file(repo.0.join(deleted)).unwrap();
+        repo.write("selected workspace/modified branch file.txt", "branch after\n");
+        repo.write("outside.txt", "outside branch change\n");
+        repo.commit();
+        let outside = repo.outside_index();
+        let changes = repo.changes(true);
+        let rows = changes["changes"].as_array().unwrap();
+        assert_eq!(rows.len(), 3, "branch review must exclude outside changes: {changes}");
+        assert!(rows.iter().all(|change| change["path"].as_str().unwrap().starts_with("selected workspace/")));
+        assert_eq!(rows.iter().find(|change| change["path"] == new).unwrap()["oldPath"], old);
+        assert!(repo.diff(new, Some(old), "branch").unwrap().contains("rename from selected workspace/old branch name.txt"));
+        assert!(repo.diff(deleted, None, "branch").unwrap().contains("-branch delete contents"));
+        assert!(repo.diff("selected workspace/modified branch file.txt", None, "branch").unwrap().contains("+branch after"));
+        assert_eq!(repo.outside_index(), outside);
+    }
+
+    #[test]
+    fn nested_git_cross_boundary_renames_are_scoped_additions_and_deletions() {
+        let repo = GitTestRepo::new();
+        let leaving = "selected workspace/leaving file.txt";
+        let arriving = "selected workspace/arriving file.txt";
+        repo.write(leaving, "unique leaving contents\n");
+        repo.write("outside.txt", "unique arriving contents\n");
+        repo.commit();
+        git(&repo.0, &["checkout", "-qb", "feature"]).unwrap();
+        std::fs::rename(repo.0.join(leaving), repo.0.join("outside renamed.txt")).unwrap();
+        std::fs::rename(repo.0.join("outside.txt"), repo.0.join(arriving)).unwrap();
+        git(&repo.0, &["add", "--all"]).unwrap();
+        let outside_before = git(&repo.0, &["ls-files", "--stage", "-z", "--", "outside renamed.txt", "outside.txt"]).unwrap();
+        for branch in [false, true] {
+            if branch { repo.commit(); }
+            let changes = repo.changes(branch);
+            let rows = changes["changes"].as_array().unwrap();
+            assert_eq!(rows.len(), 2, "both in-scope sides must be represented: {changes}");
+            let addition = rows.iter().find(|change| change["path"] == arriving).expect("arrival must be an in-scope addition");
+            assert_eq!(addition["index"], "A");
+            assert!(addition["oldPath"].is_null());
+            let deletion = rows.iter().find(|change| change["path"] == leaving).expect("departure must be an in-scope deletion");
+            assert_eq!(deletion["index"], "D");
+            assert!(deletion["oldPath"].is_null());
+            let mode = if branch { "branch" } else { "staged" };
+            assert!(repo.diff(arriving, None, mode).unwrap().contains("+unique arriving contents"));
+            assert!(repo.diff(leaving, None, mode).unwrap().contains("-unique leaving contents"));
+            if !branch {
+                repo.stage(arriving, None, false).unwrap();
+                repo.stage(leaving, None, false).unwrap();
+                assert_eq!(git(&repo.0, &["ls-files", "--stage", "-z", "--", "outside renamed.txt", "outside.txt"]).unwrap(), outside_before);
+                repo.stage(arriving, None, true).unwrap();
+                repo.stage(leaving, None, true).unwrap();
+            }
+        }
+        assert_eq!(git(&repo.0, &["ls-files", "--stage", "-z", "--", "outside renamed.txt", "outside.txt"]).unwrap(), outside_before);
+    }
+
+    #[test]
+    fn nested_git_rejects_outside_and_malformed_paths_before_mutation() {
+        let repo = GitTestRepo::new();
+        let inside = "selected workspace/inside.txt";
+        repo.write(inside, "before\n");
+        repo.write("outside.txt", "before\n");
+        repo.write("selected workspace sibling/outside.txt", "before\n");
+        repo.commit();
+        repo.write(inside, "after\n");
+        repo.write("outside.txt", "after\n");
+        let index = git(&repo.0, &["ls-files", "--stage", "-z"]).unwrap();
+        for path in ["outside.txt", "selected workspace sibling/outside.txt", "../outside.txt", "/outside.txt", ":(glob)**", ""] {
+            assert!(repo.diff(path, None, "working").is_err(), "accepted out-of-scope path {path:?}");
+            assert!(repo.diff(path, None, "untracked").is_err());
+            assert!(repo.stage(path, None, true).is_err());
+            assert!(repo.stage(path, None, false).is_err());
+        }
+        assert!(repo.diff(inside, Some("outside.txt"), "working").is_err());
+        assert!(repo.stage(inside, Some("outside.txt"), true).is_err());
+        assert_eq!(git(&repo.0, &["ls-files", "--stage", "-z"]).unwrap(), index);
+        assert_eq!(std::fs::read_to_string(repo.0.join("outside.txt")).unwrap(), "after\n");
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn nested_git_rejects_symlink_escape_even_for_missing_files() {
+        let repo = GitTestRepo::new();
+        repo.write("outside.txt", "outside secret\n");
+        repo.commit();
+        std::os::unix::fs::symlink(&repo.0, repo.workspace().join("escape")).unwrap();
+        let before = git(&repo.0, &["ls-files", "--stage", "-z"]).unwrap();
+        for path in ["selected workspace/escape/outside.txt", "selected workspace/escape/missing.txt"] {
+            assert!(repo.diff(path, None, "working").is_err());
+            assert!(repo.diff(path, None, "untracked").is_err());
+            assert!(repo.stage(path, None, true).is_err());
+        }
+        assert!(scoped_path(&repo.workspace(), "escape/outside.txt").is_err());
+        assert_eq!(git(&repo.0, &["ls-files", "--stage", "-z"]).unwrap(), before);
+    }
+
     #[test]
     fn git_stage_uses_literal_paths_and_handles_an_unborn_repository() {
         let root = super::super::tests::scratch();

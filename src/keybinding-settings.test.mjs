@@ -7,6 +7,7 @@ const flush=()=>new Promise((done)=>setImmediate(done));
 function fixture(options={}) {
   const window=new Window();
   window.document.body.innerHTML='<input id="keybind-search"><div id="keybind-status"></div><div id="keybind-list"></div>';
+  if (options.platform) Object.defineProperty(window.navigator,"platform",{configurable:true,value:options.platform});
   const old={window:globalThis.window,document:globalThis.document,localStorage:globalThis.localStorage};
   Object.assign(globalThis,{window,document:window.document,localStorage:window.localStorage});
   for (const [key,value] of Object.entries(options.storage||{})) window.localStorage.setItem(key,value);
@@ -33,6 +34,14 @@ test("macOS key capture uses physical Option keys, canonical modifiers and valid
   assert.equal(keyEventCombo({key:"Process",code:"KeyA",isComposing:true}),null);
   assert.equal(terminalKeySequence({key:"l",code:"KeyL",metaKey:true}),"\x1b[108;9u");
 });
+test("queue terminal input follows saved and disabled keybindings instead of a hardcoded Alt Enter", async () => {
+  for (const [overrides, expected] of [[{}, "\x1b[13;3u"], [{ "app.message.followUp": "ctrl+q" }, "\x1b[113;5u"], [{ "app.message.followUp": [] }, undefined]]) {
+    const f = fixture({ overrides });
+    try { await f.controller.ready; assert.equal(f.controller.sequence("app.message.followUp"), expected); }
+    finally { f.close(); }
+  }
+});
+
 test("function-key forwarding emits only native Pi-supported sequences", () => {
   const codes=[11,12,13,14,15,17,18,19,20,21,23,24];
   for(const [index,code] of codes.entries())
@@ -94,6 +103,15 @@ test("GUI settings restore valid overrides and discard malformed stored combinat
   assert.equal(f.controller.matches("gui.palette",{key:"b",metaKey:true}),true);
   assert.equal(f.controller.matches("gui.files",{key:"p",metaKey:true}),true);
   assert.equal(f.controller.matches("gui.review",{key:"r",metaKey:true}),false);
+  f.close();
+});
+test("Windows maps GUI super bindings to Ctrl without consuming Pi Control bindings", async () => {
+  const f=fixture({platform:"Win32"});await f.controller.ready;
+  assert.equal(f.controller.matches("gui.palette",{key:"k",code:"KeyK",ctrlKey:true}),true);
+  assert.equal(f.controller.matches("gui.palette",{key:"k",code:"KeyK",metaKey:true}),false);
+  f.record("gui.palette");f.key("b",{ctrlKey:true,code:"KeyB"});await flush();
+  assert.equal(JSON.parse(f.window.localStorage.getItem("pi.guiKeybindings"))["gui.palette"],"super+b");
+  assert.equal(f.controller.matches("gui.palette",{key:"b",code:"KeyB",ctrlKey:true}),true);
   f.close();
 });
 test("recording rejects unsupported native function combinations without persisting dead shortcuts", async () => {

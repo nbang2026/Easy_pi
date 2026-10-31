@@ -116,14 +116,14 @@ fn bundled_runtime(resource_dir: &Path) -> Result<Option<Runtime>, String> {
     for relative in BUNDLE_FILES {
         let path = root.join(relative);
         if !path.is_file() || path.metadata().map(|m| m.len() == 0).unwrap_or(true) {
-            return Err(format!("Bundled Pi runtime is incomplete ({relative}). Reinstall N_B_PI."));
+            return Err(format!("Bundled Pi runtime is incomplete ({relative}). Reinstall easy_pi."));
         }
     }
     let package: serde_json::Value = std::fs::read(root.join(BUNDLE_FILES[3]))
         .map_err(|e| format!("Bundled Pi metadata: {e}"))
         .and_then(|bytes| serde_json::from_slice(&bytes).map_err(|e| format!("Bundled Pi metadata: {e}")))?;
     if package["name"] != "@earendil-works/pi-coding-agent" || package["version"] != "1.3.0" {
-        return Err("Bundled Pi metadata is invalid. Reinstall N_B_PI.".into());
+        return Err("Bundled Pi metadata is invalid. Reinstall easy_pi.".into());
     }
     Ok(Some(Runtime::Bundled {
         node: root.join(BUNDLE_FILES[0]),

@@ -87,7 +87,7 @@ test("typing and scroll buffers stay short and cannot delay a button sound", asy
   const f=audioFixture();
   await f.player.play("typing");await f.player.play("scroll");await f.player.play("click");
   assert.equal(f.sources.length,3);
-  assert.equal(f.sources[0].buffer.duration,0.025);
+  assert.equal(f.sources[0].buffer.duration,0.045);
   assert.ok(Math.abs(f.sources[1].buffer.duration-0.035)<=1/48000+1e-9);
   assert.ok(f.sources.at(-1).started);
   assert.equal(f.sources.filter((source)=>source.started&&!source.stopped).length,2);

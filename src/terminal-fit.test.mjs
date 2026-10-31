@@ -21,7 +21,7 @@ test("the actual FitAddon keeps terminal rows outside footer and toolbar space a
       for (const fontSize of [12, 16, 28]) {
         for (const controlSize of [32, 36, 44]) {
           for (const frameHidden of [false, true]) {
-            const footerHeight = frameHidden ? 0 : controlSize + 16;
+            const footerHeight = controlSize + 16;
             const top = controlSize + 22;
             const parentHeight = height - top - footerHeight - 8;
             const parentWidth = width - 24;

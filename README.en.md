@@ -1,6 +1,6 @@
 <div align="center">
   <img src="app-icon.png" width="96" alt="easy_pi application icon" />
-  <h1>easy_pi</h1>
+  <h1>easy_pi 1.1.0</h1>
   <p><strong>A more intuitive desktop workspace for Pi and Claude coding agents.</strong></p>
   <p>Windows x64 · macOS Apple Silicon · Tauri v2 · Rust · TypeScript · Vite · xterm.js</p>
   <p><strong><a href="https://github.com/nbang2026/Easy_pi/releases">Windows installers &amp; macOS apps</a></strong></p>
@@ -8,6 +8,19 @@
 </div>
 
 ---
+
+## Quick downloads
+
+| Platform / Package | Download | Current status |
+| --- | --- | --- |
+| **macOS · Apple Silicon / arm64** | **[Download Mac installer (.dmg)](https://github.com/nbang2026/Easy_pi/releases/download/v1.1.0/easy_pi-1.1.0-macOS-arm64-20261031.dmg)** | **1.1.0** · about 299 MiB |
+| **Windows · x64** | **[Download Windows installer (.exe)](https://github.com/nbang2026/Easy_pi/releases/download/v1.1.0/easy_pi_1.1.0_PiRepair3_20261029_x64-setup.exe)** | **1.1.0 PiRepair3** · Maintainer-supplied original; Windows-native acceptance pending. See release notes for verification scope. |
+| macOS source + environment | [Download source-with-environment ZIP](https://github.com/nbang2026/Easy_pi/releases/download/v1.1.0/easy_pi-1.1.0-macOS-Source-Environment-20261028184300.zip) | About 987 MiB; a developer kit, not an installer. |
+| Windows source + Pi runtime | [Download Windows source ZIP](https://github.com/nbang2026/Easy_pi/releases/download/v1.1.0/easy_pi-1.1.0-Windows-Source-20261031.zip) | Current 1.1.0 project and Windows Pi runtime; not a claim of Windows build or native validation. |
+
+[1.1.0 release notes and SHA-256 checksums](https://github.com/nbang2026/Easy_pi/releases/tag/v1.1.0) · [Installation steps](#download-and-install) · [Older releases](https://github.com/nbang2026/Easy_pi/releases)
+
+The Mac DMG is not Apple notarized. Pi mode requires local Node.js 22.19+ and Pi CLI. Consult the release notes for Windows asset verification and availability.
 
 ## What is easy_pi?
 
@@ -44,13 +57,13 @@ It brings model connections, project sessions, files, Git review, Agent / Skill 
 > Building and uploading are separate steps. A new package absent from Releases is not publicly downloadable there. GitHub-generated source ZIPs and source-with-environment kits are not application installers.
 
 > [!WARNING]
-> **Publication check, October 31, 2026:** This release currently provides macOS assets. Archive-structure and declared-length checks on the local Windows PiRepair3 copies remain unresolved, and Windows-native acceptance testing has not been performed. Windows assets are not attached yet. Inability to execute an EXE on macOS is not a corruption test; the cause has not been established.
+> **Publication check, October 31, 2026:** The Windows PiRepair3 installer is supplied unchanged by the maintainer, without Windows-native acceptance testing. A local declared-length discrepancy remains unresolved; do not treat it as a verified working installer. Inability to run an EXE on macOS is not a corruption test. Source archives and installers have separate verification scopes; see the release notes.
 
 ### Windows x64
 
-**[View Windows installation assets](https://github.com/nbang2026/Easy_pi/releases)**
+**[Download Windows installer](https://github.com/nbang2026/Easy_pi/releases/download/v1.1.0/easy_pi_1.1.0_PiRepair3_20261029_x64-setup.exe)**
 
-1. Download the release's `.exe` installer, or its `.msi` if provided.
+1. Read the Windows verification scope first; an unaccepted asset is not a verified working installer. Download the release's `.exe`, or its `.msi` if provided.
 2. Verify provenance and the accompanying SHA-256, then install and launch easy_pi.
 3. Check the runtime in Settings, configure a model connection and select a project.
 
@@ -58,7 +71,7 @@ The full Windows build configuration includes target-specific Node / Pi and Clau
 
 ### macOS Apple Silicon
 
-**[View macOS application assets](https://github.com/nbang2026/Easy_pi/releases)**
+**[Download Mac installer](https://github.com/nbang2026/Easy_pi/releases/download/v1.1.0/easy_pi-1.1.0-macOS-arm64-20261031.dmg)**
 
 1. Download an Apple Silicon / arm64 application ZIP, or a DMG if provided, and verify its SHA-256.
 2. Extract the ZIP or mount the DMG and move `easy_pi.app` into Applications.

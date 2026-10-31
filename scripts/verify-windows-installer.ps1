@@ -1,5 +1,5 @@
 # Run only in a disposable Windows account/CI. NSIS writes registry and shortcuts.
-# Local build-windows.ps1 skips this unless -VerifyInstallers is supplied.
+# Invoked by build-desktop-windows.ps1 only when -VerifyInstallers is supplied.
 param(
   [Parameter(Mandatory=$true)][string]$Installer,
   [Parameter(Mandatory=$true)][string]$Msi
@@ -15,6 +15,7 @@ $installPath = Join-Path $testRoot "installed"
 $adminPath = Join-Path $testRoot "msi payload"
 $oldRuntime = $env:PI_GUI_SMOKE_RUNTIME
 $oldPath = $env:PI_GUI_SMOKE_PATH
+$oldClaudeSmoke = $env:EASY_PI_CLAUDE_SMOKE_RESOURCES
 function Run-Installer([string]$Program, [string]$Arguments) {
   $info = New-Object System.Diagnostics.ProcessStartInfo
   $info.FileName = $Program
@@ -31,9 +32,23 @@ function Test-Payload([string]$Root) {
   & node scripts/check-windows-runtime.mjs ("--runtime=" + $runtimePath) --require-windows
   if ($LASTEXITCODE -ne 0) { throw "Installed runtime validation failed" }
   $env:PI_GUI_SMOKE_RUNTIME = Split-Path (Split-Path $runtimePath -Parent) -Parent
+  $claudeRuntime = Join-Path $env:PI_GUI_SMOKE_RUNTIME "claude-runtime"
+  & node scripts/prepare-claude-runtime.mjs --platform win32 --arch x64 --check --runtime $claudeRuntime
+  if ($LASTEXITCODE -ne 0) { throw "Installed Claude runtime validation failed" }
+  $env:EASY_PI_CLAUDE_SMOKE_RESOURCES = $claudeRuntime
   $env:PI_GUI_SMOKE_PATH = (Join-Path $env:SystemRoot "System32") + ";" + $env:SystemRoot
   & cargo test --manifest-path src-tauri/Cargo.toml --target x86_64-pc-windows-msvc --lib real_pi_launch -- --ignored
   if ($LASTEXITCODE -ne 0) { throw "Installed runtime PTY and bridge smoke test failed" }
+  $priorTrust = $env:PI_GUI_SMOKE_PROJECT_TRUST
+  try {
+    foreach ($decision in @("deny", "allow")) {
+      $env:PI_GUI_SMOKE_PROJECT_TRUST = $decision
+      & cargo test --manifest-path src-tauri/Cargo.toml --target x86_64-pc-windows-msvc --lib gui_bridge::tests::real_pi_launch_uses_the_app_transport -- --ignored --exact
+      if ($LASTEXITCODE -ne 0) { throw "Installed Pi project-trust startup failed: $decision" }
+    }
+  } finally { $env:PI_GUI_SMOKE_PROJECT_TRUST = $priorTrust }
+  & cargo test --manifest-path src-tauri/Cargo.toml --target x86_64-pc-windows-msvc --lib claude_staged_runtime_smoke -- --ignored
+  if ($LASTEXITCODE -ne 0) { throw "Installed Claude runtime smoke test failed" }
 }
 New-Item -ItemType Directory -Path $testRoot | Out-Null
 try {
@@ -44,10 +59,11 @@ try {
   $arguments = '/a "' + $Msi + '" /qn TARGETDIR="' + $adminPath + '" /norestart /l*v "' + (Join-Path $testRoot 'msi.log') + '"'
   Run-Installer (Join-Path $env:SystemRoot "System32/msiexec.exe") $arguments
   Test-Payload $adminPath
-  Write-Host "PASS: NSIS/MSI payloads and real Pi PTY/bridge with spaces and Unicode in the path."
+  Write-Host "PASS: NSIS/MSI payloads and Pi/Claude runtime smoke tests with spaces and Unicode in the path."
 } finally {
   $env:PI_GUI_SMOKE_RUNTIME = $oldRuntime
   $env:PI_GUI_SMOKE_PATH = $oldPath
+  $env:EASY_PI_CLAUDE_SMOKE_RESOURCES = $oldClaudeSmoke
   $uninstaller = Join-Path $installPath "uninstall.exe"
   if (Test-Path -LiteralPath $uninstaller) { Run-Installer $uninstaller ("/S _?=" + $installPath) }
   # Remove only this script's uniquely generated test directory.

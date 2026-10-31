@@ -679,10 +679,10 @@ for (const [label, marketKey] of [["numeric", 123], ["object", { source: "github
   }
 }
 
-test("the forty-Agent cap permits the fortieth import but not the forty-first or concurrent overflow", async () => {
+test("the 128-Agent cap permits the last import but not concurrent overflow", async () => {
   const f = await fixture();
   try {
-    const locals = Array.from({ length: 39 }, (_, index) => ({ id: randomUUID(), title: `Local ${index}`, content: `# Local ${index}`, updatedAt: index + 1 }));
+    const locals = Array.from({ length: 127 }, (_, index) => ({ id: randomUUID(), title: `Local ${index}`, content: `# Local ${index}`, updatedAt: index + 1 }));
     await seed(f, locals);
     const preview = await previewBuiltin(f.library);
     const otherPreview = await previewBuiltin(f.library, "test-engineer");
@@ -690,32 +690,32 @@ test("the forty-Agent cap permits the fortieth import but not the forty-first or
     const attempts = await Promise.allSettled([f.library.run(importRequest(preview)), other.run(importRequest(otherPreview))]);
     assert.equal(attempts.filter((result) => result.status === "fulfilled").length, 1);
     const failed = attempts.find((result) => result.status === "rejected");
-    assert.match(failed.reason.message, /40/);
+    assert.match(failed.reason.message, /128/);
     const winner = attempts.findIndex((result) => result.status === "fulfilled");
     const imported = attempts[winner].value;
     const previews = [preview, otherPreview];
-    assert.equal((await f.library.run({ kind: "list" })).agents.length, 40);
+    assert.equal((await f.library.run({ kind: "list" })).agents.length, 128);
     const before = await readFile(f.filename);
-    await assert.rejects(f.library.run(importRequest(previews[1 - winner])), /40/);
+    await assert.rejects(f.library.run(importRequest(previews[1 - winner])), /128/);
     assert.deepEqual(await f.library.run(importRequest(previews[winner])), { id: imported.id, alreadyImported: true });
     assert.deepEqual(await readFile(f.filename), before);
     await other.run({ kind: "agent", action: "remove", id: locals[0].id });
     assert.equal((await f.library.run(importRequest(previews[1 - winner]))).alreadyImported, false);
-    assert.equal((await f.library.run({ kind: "list" })).agents.length, 40);
+    assert.equal((await f.library.run({ kind: "list" })).agents.length, 128);
     assert.equal(f.calls.length, 0);
   } finally { await f.close(); }
 });
 
-test("damaged preserved Agents still count toward the forty-Agent import cap", async () => {
+test("damaged preserved Agents still count toward the 128-Agent import cap", async () => {
   const f = await fixture();
   try {
-    const agents = Array.from({ length: 39 }, (_, index) => ({ id: randomUUID(), title: `Local ${index}`, content: "# Existing", updatedAt: 1 }));
+    const agents = Array.from({ length: 127 }, (_, index) => ({ id: randomUUID(), title: `Local ${index}`, content: "# Existing", updatedAt: 1 }));
     agents.push({ id: "damaged", title: "", content: "Preserve me", updatedAt: 1 });
     await seed(f, agents);
     const before = await readFile(f.filename);
     const preview = await previewBuiltin(f.library);
     assert.equal((await f.library.run({ kind: "list" })).skipped, 1);
-    await assert.rejects(f.library.run(importRequest(preview)), /40/);
+    await assert.rejects(f.library.run(importRequest(preview)), /128/);
     assert.deepEqual(await readFile(f.filename), before);
     assert.deepEqual((await f.library.run({ kind: "market", action: "list" })).installed, []);
   } finally { await f.close(); }

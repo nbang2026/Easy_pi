@@ -1,0 +1,76 @@
+#pane-skills.skill-library { display: flex; flex-direction: column; gap: 14px; min-width: 0; color: var(--text, inherit); }
+#pane-skills.skill-library[hidden], #pane-skills [hidden] { display: none !important; }
+#pane-skills h2, #pane-skills h3, #pane-skills h4, #pane-skills p { margin: 0; }
+#pane-skills .skill-library-subtitle, #pane-skills .skill-empty, #pane-skills .skill-result-source { color: var(--muted, #888); font-size: 12px; line-height: 1.6; }
+#pane-skills .skill-library-tabs { display: flex; gap: 6px; border-bottom: 1px solid var(--border, #8884); padding-bottom: 8px; }
+#pane-skills button, #pane-skills input, #pane-skills select { font: inherit; }
+#pane-skills button { padding: 7px 11px; border: 1px solid var(--border, #8885); border-radius: 7px; color: inherit; background: var(--surface, transparent); cursor: pointer; }
+#pane-skills button:hover:not(:disabled) { background: var(--hover, #8882); }
+#pane-skills button:disabled { opacity: .5; cursor: default; }
+#pane-skills button:focus-visible, #pane-skills input:focus-visible, #pane-skills select:focus-visible { outline: 2px solid var(--accent, #6484dd); outline-offset: 2px; }
+#pane-skills [role="tab"][aria-selected="true"], #pane-skills .skill-installed-row.is-selected { border-color: var(--accent, #6484dd); background: var(--accent-soft, #6484dd14); }
+#pane-skills .skill-library-status { min-height: 1.5em; font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
+#pane-skills .skill-retry-connection { align-self: start; }
+#pane-skills .is-error, #pane-skills .skill-source-error { color: var(--danger, #c74b50); }
+#pane-skills .skill-reload-status, #pane-skills .skill-job { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px; border: 1px solid var(--border, #8884); border-radius: 8px; font-size: 12px; line-height: 1.5; }
+#pane-skills .skill-discover, #pane-skills .skill-downloaded { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+#pane-skills .skill-search-form, #pane-skills .skill-url-form { display: flex; flex-wrap: wrap; align-items: end; gap: 8px; }
+#pane-skills .skill-search-form label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; }
+#pane-skills .skill-query, #pane-skills .skill-url { min-width: 150px; flex: 1; }
+#pane-skills input:not([type="checkbox"]), #pane-skills select { min-height: 34px; padding: 6px 9px; border: 1px solid var(--border, #8885); border-radius: 7px; color: inherit; background: var(--input-bg, transparent); box-sizing: border-box; }
+#pane-skills select option { color: var(--text, #222); background: var(--bg, #fff); }
+#pane-skills .skill-search-results { display: flex; flex-direction: column; gap: 18px; }
+#pane-skills .skill-view-title { font-size: 14px; }
+#pane-skills .skill-home[aria-pressed="true"] { border-color: var(--accent, #6484dd); background: var(--accent-soft, #6484dd14); }
+#pane-skills .skill-source-panel { display: flex; flex-direction: column; gap: 12px; padding: 14px; min-width: 0; border: 1px solid var(--border, #8884); border-radius: 10px; }
+#pane-skills .skill-source-heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+#pane-skills .skill-source-heading h4 { font-size: 13px; }
+#pane-skills .skill-source-state { font-size: 11px; line-height: 1.5; color: var(--muted, #888); }
+#pane-skills .skill-source-state.is-error { color: var(--danger, #c74b50); }
+#pane-skills .skill-source-state.is-connected { color: var(--text, inherit); }
+#pane-skills .skill-source-state.is-connected::before { content: ""; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: currentColor; margin-inline-end: 6px; vertical-align: 1px; }
+#pane-skills .skill-source-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(230px, 100%), 1fr)); gap: 10px; }
+#pane-skills .skill-source-panel > .skill-load-more { align-self: start; }
+#pane-skills .skill-result-metadata { color: var(--muted, #888); user-select: text; }
+#pane-skills .skill-result-source { border: 1px solid var(--border, #8884); border-radius: 4px; padding: 1px 5px; }
+#pane-skills .skill-source-panel[data-state="loading"] .skill-source-state { animation: skill-source-loading 1.5s ease-in-out infinite alternate; }
+@keyframes skill-source-loading { to { opacity: .55; } }
+@media (prefers-reduced-motion: reduce) { #pane-skills .skill-source-panel[data-state="loading"] .skill-source-state { animation: none; } }
+#pane-skills .skill-result { display: flex; flex-direction: column; align-items: start; gap: 8px; border: 1px solid var(--border, #8884); border-radius: 9px; padding: 12px; overflow-wrap: anywhere; min-width: 0; }
+#pane-skills .skill-result h3 { font-size: 14px; }
+#pane-skills .skill-result p { font-size: 12px; line-height: 1.55; white-space: pre-wrap; }
+#pane-skills .skill-result button { margin-top: auto; }
+#pane-skills .skill-source-errors, #pane-skills .skill-installed-list { display: flex; flex-direction: column; gap: 8px; }
+#pane-skills .skill-source-error { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 12px; overflow-wrap: anywhere; }
+#pane-skills .skill-installed-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px; border: 1px solid var(--border, #8884); border-radius: 8px; }
+#pane-skills .skill-select { flex: 1; min-width: 130px; text-align: left; overflow-wrap: anywhere; }
+#pane-skills .skill-enable-label { display: flex; align-items: center; gap: 6px; font-size: 12px; }
+#pane-skills .skill-detail { border: 1px solid var(--border, #8885); border-radius: 10px; padding: 14px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+#pane-skills .skill-detail-heading { display: flex; align-items: start; justify-content: space-between; gap: 12px; }
+#pane-skills .skill-detail-heading h3 { overflow-wrap: anywhere; font-size: 15px; }
+#pane-skills .skill-detail h4 { font-size: 12px; }
+#pane-skills .skill-description { font-size: 12px; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }
+#pane-skills .skill-provenance { display: grid; grid-template-columns: minmax(75px, auto) minmax(0, 1fr); gap: 5px 12px; margin: 0; font-size: 12px; line-height: 1.5; }
+#pane-skills .skill-provenance dt { color: var(--muted, #888); }
+#pane-skills .skill-provenance dd { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; user-select: text; }
+#pane-skills .skill-files { margin: 0; padding-left: 20px; max-height: 190px; overflow: auto; font-size: 12px; line-height: 1.7; overflow-wrap: anywhere; }
+#pane-skills .skill-files { list-style: none; padding-left: 0; }
+#pane-skills .skill-file { display: block; width: 100%; border: 0; border-radius: 4px; text-align: left; overflow-wrap: anywhere; }
+#pane-skills .skill-file[aria-pressed="true"] { background: var(--accent-soft, #6484dd14); box-shadow: inset 2px 0 var(--accent, #6484dd); }
+#pane-skills .skill-content { margin: 0; padding: 12px; border: 1px solid var(--border, #8884); border-radius: 7px; background: var(--code-bg, #8881); max-height: 330px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font: 12px/1.65 ui-monospace, SFMono-Regular, Menlo, monospace; user-select: text; }
+#pane-skills .skill-warnings { color: var(--warning, #ad782b); font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; }
+#pane-skills .skill-warnings:empty { display: none; }
+#pane-skills .skill-consent-label { display: flex; align-items: start; gap: 8px; font-size: 12px; line-height: 1.6; }
+#pane-skills input[type="checkbox"] { flex: none; margin: 3px 0; accent-color: var(--accent, #6484dd); }
+#pane-skills .skill-install { align-self: start; }
+#pane-skills .skill-remove-confirm { position: relative; border: 1px solid var(--danger, #c74b50); border-radius: 9px; padding: 14px; background: var(--surface, transparent); display: flex; flex-wrap: wrap; gap: 10px; font-size: 12px; }
+#pane-skills .skill-remove-confirm h3, #pane-skills .skill-remove-confirm p { flex-basis: 100%; overflow-wrap: anywhere; }
+#pane-skills .skill-remove-accept { color: var(--danger, #c74b50); }
+@media (max-width: 540px) {
+  #pane-skills .skill-search-form label { flex-basis: 100%; }
+  #pane-skills .skill-search-form select { width: 100%; }
+  #pane-skills .skill-reload-status { align-items: start; flex-direction: column; }
+  #pane-skills .skill-installed-row .skill-select { flex-basis: 100%; }
+  #pane-skills .skill-provenance { grid-template-columns: 1fr; gap: 2px; }
+  #pane-skills .skill-provenance dd { margin-bottom: 6px; }
+}

@@ -1,6 +1,6 @@
 <div align="center">
   <img src="app-icon.png" width="96" alt="easy_pi 应用图标 / easy_pi app icon" />
-  <h1>easy_pi</h1>
+  <h1>easy_pi 1.1.0</h1>
   <p><strong>让 Pi 与 Claude 编码智能体拥有一个更直观的桌面工作环境。</strong></p>
   <p><strong>A more intuitive desktop workspace for Pi and Claude coding agents.</strong></p>
   <p>Windows x64 · macOS Apple Silicon · Tauri v2 · Rust · TypeScript · Vite · xterm.js</p>
@@ -9,6 +9,20 @@
 </div>
 
 ---
+
+## 立即下载 / Quick downloads
+
+| 平台 / Package | 下载 / Download | 当前状态 / Status |
+| --- | --- | --- |
+| **macOS · Apple Silicon / arm64** | **[下载 Mac 安装盘 (.dmg)](https://github.com/nbang2026/Easy_pi/releases/download/v1.1.0/easy_pi-1.1.0-macOS-arm64-20261031.dmg)** | **1.1.0** · 约 299 MiB / about 299 MiB |
+| **Windows · x64** | **[下载 Windows 安装包 (.exe)](https://github.com/nbang2026/Easy_pi/releases/download/v1.1.0/easy_pi_1.1.0_PiRepair3_20261029_x64-setup.exe)** | **1.1.0 PiRepair3** · 维护者提供的原始文件，未完成 Windows 实机验收；检查范围见发布说明。<br>Maintainer-supplied original; Windows-native acceptance pending. See release notes for verification scope. |
+| macOS 配套源码与环境 / Source + environment | [下载含环境源码 ZIP](https://github.com/nbang2026/Easy_pi/releases/download/v1.1.0/easy_pi-1.1.0-macOS-Source-Environment-20261028184300.zip) | 约 987 MiB；开发包，不是安装程序。<br>About 987 MiB; a developer kit, not an installer. |
+| Windows 源码与 Pi 运行资源 / Source + Pi runtime | [下载 Windows 源码 ZIP](https://github.com/nbang2026/Easy_pi/releases/download/v1.1.0/easy_pi-1.1.0-Windows-Source-20261031.zip) | 当前 1.1.0 工程与 Windows Pi 运行资源；不代表已在 Windows 构建或验证。<br>Current 1.1.0 project and Windows Pi runtime; not a claim of Windows build or native validation. |
+
+[1.1.0 发布说明与 SHA-256 / Release notes and checksums](https://github.com/nbang2026/Easy_pi/releases/tag/v1.1.0) · [安装步骤 / Installation](#下载与安装--download-and-install) · [历史版本 / Older releases](https://github.com/nbang2026/Easy_pi/releases)
+
+Mac 安装盘未 Apple 公证；Pi 模式需要本机 Node.js 22.19+ 与 Pi CLI。Windows 附件的核验范围与进度见发布说明。<br>
+The Mac DMG is not Apple notarized. Pi mode requires local Node.js 22.19+ and Pi CLI. Consult the release notes for Windows asset verification and availability.
 
 ## 项目介绍 / Introduction
 
@@ -59,15 +73,15 @@ Use the graphical conversation and workbench or keep a compact terminal workflow
 > Building and uploading are separate steps. A new package absent from Releases is not publicly downloadable there. GitHub-generated source ZIPs and source-with-environment kits are not application installers.
 
 > [!WARNING]
-> **2026-10-31 发布检查 / Publication check**：本次发布先提供 macOS 附件。Windows PiRepair3 的本地副本存在归档结构与声明长度不一致的检查结果，尚未在 Windows 实机验收，因此暂未附加；这不等于根据 macOS 无法运行 EXE 判断应用损坏，也不代表已确认问题来源。<br>
-> This release currently provides macOS assets. Archive-structure and declared-length checks on the local Windows PiRepair3 copies remain unresolved, and Windows-native acceptance testing has not been performed. Windows assets are not attached yet. Inability to execute an EXE on macOS is not a corruption test; the cause has not been established.
+> **2026-10-31 发布检查 / Publication check**：Windows PiRepair3 安装包按维护者提供的原始字节发布，未完成 Windows 实机验收；本地声明长度检查差异仍需复核，不能当作已验证可用的安装包。Mac 无法运行 EXE 不是损坏依据，问题来源尚未确定。源码包与安装包的验证范围不同，详见发布说明。<br>
+> The Windows PiRepair3 installer is supplied unchanged by the maintainer, without Windows-native acceptance testing. A local declared-length discrepancy remains unresolved; do not treat it as a verified working installer. Inability to run an EXE on macOS is not a corruption test. Source archives and installers have separate verification scopes; see the release notes.
 
 ### Windows x64
 
-**[查看 Windows 安装附件 / View Windows installation assets](https://github.com/nbang2026/Easy_pi/releases)**
+**[下载 Windows 安装包 / Download Windows installer](https://github.com/nbang2026/Easy_pi/releases/download/v1.1.0/easy_pi_1.1.0_PiRepair3_20261029_x64-setup.exe)**
 
-1. 下载对应版本的 `.exe` 安装程序；若该版本提供 `.msi`，也可选择 MSI。<br>
-   Download the release's `.exe` installer, or its `.msi` if one is provided.
+1. 先阅读发布说明中的 Windows 检查范围；未验收附件不能当作已验证可用的安装包。下载对应版本的 `.exe`；若该版本提供 `.msi`，也可选择 MSI。<br>
+   Read the Windows verification scope first; an unaccepted asset is not a verified working installer. Download the release's `.exe`, or its `.msi` if one is provided.
 2. 核对来源与随包 SHA-256，按向导安装并启动 easy_pi。<br>
    Verify provenance and the accompanying SHA-256, then install and launch easy_pi.
 3. 在设置中检查运行环境，配置模型连接，选择项目并开始任务。<br>
@@ -81,7 +95,7 @@ Git / Git Bash, project-specific SDKs, accounts and model credits remain your re
 
 ### macOS Apple Silicon
 
-**[查看 macOS 应用附件 / View macOS application assets](https://github.com/nbang2026/Easy_pi/releases)**
+**[下载 Mac 安装盘 / Download Mac installer](https://github.com/nbang2026/Easy_pi/releases/download/v1.1.0/easy_pi-1.1.0-macOS-arm64-20261031.dmg)**
 
 1. 下载对应 Apple Silicon / arm64 的应用 ZIP，或该版本实际提供的 DMG，核对 SHA-256。<br>
    Download an Apple Silicon / arm64 application ZIP, or a DMG if provided, and verify its SHA-256.

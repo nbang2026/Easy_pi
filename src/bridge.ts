@@ -11,6 +11,11 @@ export function invoke<T = void>(command: string, args?: Record<string, unknown>
     log_debug: undefined,
   };
   if (Object.prototype.hasOwnProperty.call(reads, command)) return Promise.resolve(reads[command] as T);
+  if (command === "skill_store_action" || command === "skill_store_restart") return Promise.reject(new Error(
+    document.documentElement.lang === "en"
+      ? "Browser preview is not connected to the local Skill store service."
+      : "浏览器预览未连接本地 Skill 商店服务。",
+  ));
   return Promise.reject(new Error(
     document.documentElement.lang === "en"
       ? "Browser preview is not connected to the local Pi process."

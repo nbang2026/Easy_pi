@@ -13,6 +13,7 @@ $version = & node -p "process.versions.node"
 if ($LASTEXITCODE -ne 0 -or [Version]$version -lt [Version]'22.19.0') { throw "Node >=22.19.0 is required" }
 Invoke-Native "pnpm" @("install", "--frozen-lockfile")
 Invoke-Native "node" @("scripts/prepare-windows-runtime.mjs")
+# Claude Agent dependency staging is optional for source-only export; install per agent-runtime/README.md before desktop builds.
 Invoke-Native "pnpm" @("check")
 Invoke-Native "pnpm" @("test")
 if ($Output) { Invoke-Native "node" @("scripts/package-source.mjs", ("--output=" + $Output)) }

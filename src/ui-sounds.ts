@@ -132,10 +132,10 @@ export function createSoundPlayer(options: {
     let buffer = builtinCache.get(key);
     if (!buffer) {
       const rate = audio.sampleRate;
-      const duration = event === "typing" ? 0.025 : event === "scroll" ? 0.035 : builtin === "builtin-soft" ? 0.065 : 0.038;
+      const duration = event === "typing" ? 0.045 : event === "scroll" ? 0.035 : builtin === "builtin-soft" ? 0.065 : 0.038;
       buffer = audio.createBuffer(1, Math.ceil(rate * duration), rate);
       const samples = buffer.getChannelData(0);
-      const pitch = { click: 620, toggle: 760, open: 880, close: 460, send: 1040, typing: 310, scroll: 420 }[event];
+      const pitch = { click: 620, toggle: 760, open: 880, close: 460, send: 1040, typing: 520, scroll: 420 }[event];
       for (let i = 0; i < samples.length; i++) {
         const t = i / rate;
         const envelope = Math.min(1, t / 0.002) * Math.exp(-t * (builtin === "builtin-soft" ? 85 : 130));
@@ -175,7 +175,7 @@ export function createSoundPlayer(options: {
       const fallback = !buffers[event] && !!buffers.click;
       const limit = fallback && event === "typing" ? 0.07 : fallback && event === "scroll" ? 0.09 : 3;
       const duration = Math.min(buffer.duration, limit);
-      const level = event === "typing" ? 0.45 : event === "scroll" ? 0.3 : 1;
+      const level = event === "typing" ? 0.75 : event === "scroll" ? 0.3 : 1;
       const attack = Math.min(0.002, duration / 4);
       fade.gain.setValueAtTime(0, start);
       fade.gain.linearRampToValueAtTime(level, start + attack);

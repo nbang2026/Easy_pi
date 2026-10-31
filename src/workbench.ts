@@ -1,14 +1,17 @@
 import { listen } from "@tauri-apps/api/event";
 import { icon } from "./icons";
-import { toReference } from "./utils";
-import { canSubmit, isGuiShortcut, normalizedState, parseDraft, sameDraft, shouldSendOnEnter, type AgentState, type Draft } from "./composer-state";
+import { formatUserError, toReference } from "./utils.ts";
+import { canSubmit, isAbsoluteAttachmentPath, isGuiShortcut, normalizedState, parseDraft, sameDraft, shouldSendOnEnter, type AgentState, type Draft } from "./composer-state";
+import { normalizeFileText, preserveFileLineEndings } from "./file-text";
+import { createWorkProgress } from "./work-progress";
 
 type Session = { path: string; id: string; cwd: string; title: string; modified: number };
 type FileEntry = { path: string; name: string; directory: boolean };
 type Change = { path: string; oldPath?: string; index: string; worktree: string; untracked: boolean };
-type Panel = "files" | "history" | "review" | "diagnostics";
+type Panel = "work" | "files" | "history" | "review" | "diagnostics";
 type Options = {
   desktop: boolean;
+  engine?: () => "pi" | "claude";
   invoke: <T = void>(command: string, args?: Record<string, unknown>) => Promise<T>;
   language: () => string;
   mode: () => string;
@@ -19,18 +22,22 @@ type Options = {
   settings: () => void;
   panelOpened: () => void;
   stateChanged?: (state: AgentState) => void;
+  conversationSubmit?: (text: string, attachments: string[]) => void;
+  beforeSubmit?: (text: string) => Promise<void>;
   prepareCommand?: () => void;
   matchesShortcut?: (id: string, event: KeyboardEvent) => boolean;
 };
 
 const words: Record<string, [string, string]> = {
   history: ["会话历史", "Sessions"], files: ["文件", "Files"], review: ["审阅", "Review"],
-  diagnostics: ["自动检验", "Diagnostics"], palette: ["指令面板", "Command palette"],
+  diagnostics: ["自动检验", "Diagnostics"], work: ["工作台", "Work panel"], palette: ["指令面板", "Command palette"],
   placeholder: ["向 Pi 发送消息…", "Message Pi…"], attach: ["添加文件", "Attach files"],
   command: ["Pi 指令", "Pi commands"], stop: ["停止任务", "Stop task"], send: ["发送消息", "Send message"],
   refresh: ["刷新", "Refresh"], close: ["关闭", "Close"], save: ["保存", "Save"],
   reference: ["加入输入", "Attach to message"], disconnected: ["未连接", "Disconnected"],
   blocked: ["请先处理终端弹窗", "Resolve the terminal dialog"], nativeDraft: ["终端草稿未清空", "Terminal draft is not empty"],
+  initializing: ["Pi 初始化中，首次启动可能下载辅助工具", "Pi is initializing; first launch may download helper tools"],
+  projectTrust: ["请确认项目信任弹窗", "Review the project trust dialog"],
   ready: ["就绪", "Ready"], working: ["运行中", "Working"], submitting: ["提交中", "Submitting"],
   queued: ["有排队输入", "Messages queued"], preview: ["浏览器预览", "Browser preview"],
   noSessions: ["暂无会话", "No sessions"], noFiles: ["没有找到文件", "No files found"],
@@ -46,7 +53,8 @@ const words: Record<string, [string, string]> = {
   tree: ["会话树", "Session tree"], fork: ["分支会话", "Fork session"],
   compact: ["压缩上下文", "Compact context"], reload: ["重载扩展", "Reload extensions"],
   settings: ["设置", "Settings"], fullscreen: ["切换全屏", "Toggle fullscreen"],
-  workTools: ["工作工具", "Work tools"],
+  workTools: ["工作工具", "Work tools"], overview: ["概览", "Overview"],
+  showMoreArtifacts: ["展开更多", "Show more"], showLessArtifacts: ["收起", "Show less"],
   wallpaper: ["切换壁纸", "Toggle wallpaper"], frame: ["收起或恢复边框", "Toggle frame"],
   input: ["独立输入栏", "GUI composer"], noMatches: ["没有匹配项", "No matches"],
   pendingDraft: ["请先处理正在发送的输入。", "Finish the pending submission first."],
@@ -71,14 +79,20 @@ const button = (name: string, title: string, run: () => void) => {
 };
 
 export function setupWorkbench(options: Options) {
+  const isClaude = () => options.engine?.() === "claude";
+  const draftNamespace = () => isClaude() ? "agent.guiDraft:" : "pi.guiDraft:";
   const text = (key: string) => words[key]?.[options.language() === "en" ? 1 : 0] ?? key;
+  const progress = createWorkProgress();
+  let progressSession = "";
   let state: AgentState = { ready: false, busy: false };
   let bridgeId = "";
+  let runtimeVersion = 0;
   let automaticallyChecked = "";
   let cwd = "";
   let draftKey = "pi.guiDraft:initial";
   let draft: Draft = parseDraft(read(draftKey));
   let submitting = false;
+  let preparingSubmission = false;
   let switching = false;
   let commandRunning = false;
   let presentationKey = "";
@@ -93,10 +107,15 @@ export function setupWorkbench(options: Options) {
   recents.open = read("pi.historyCollapsed") !== "true";
   let panel: Panel | undefined;
   let archived = false;
+  let artifactsExpanded = false;
   let fileDirectory = "";
   let currentFile = "";
   let fileRevision = "";
   let fileOriginal = "";
+  let fileNativeOriginal = "";
+  let fileNativeText = "";
+  let fileDocument = 0;
+  let fileEditVersion = 0;
   let changes: Change[] = [];
   let selectedChange: Change | undefined;
   let generation = 0;
@@ -104,12 +123,42 @@ export function setupWorkbench(options: Options) {
   let refreshGeneration = 0;
   let lastCompletion = false;
   let notificationEnabled = read("pi.notifications") === "true";
+  let gitGeneration = 0, gitRoot = "", gitBranch = "", gitCount = 0, gitError = "", gitPending = false;
+  const refreshHeader = () => {
+    const english = options.language() === "en";
+    const project = el("header-project"), git = el("header-git"), usage = el("header-usage"), extensions = el("header-extensions");
+    project.textContent = cwd.replace(/[\\/]+$/, "").split(/[\\/]/).pop() || cwd || (english ? "Workbench" : "工作台");
+    project.title = cwd;
+    git.textContent = gitError ? (english ? "Git unavailable" : "Git 不可用") : gitBranch ? `${gitBranch} · ${gitCount} ${english ? "changed" : "项变更"}` : gitPending ? "…" : "";
+    git.title = gitError || gitBranch;
+    usage.textContent = state.connected && state.usage
+      ? `${state.usage.tokens.toLocaleString(english ? "en-US" : "zh-CN")} tokens · ${state.usage.cost === null ? (english ? "cost unavailable" : "费用未提供") : `$${state.usage.cost.toFixed(4)}`}` : "";
+    usage.title = english ? "Recorded session totals, including compacted and branched history. USD cost uses model pricing; it is not a provider invoice." : "会话累计用量，含压缩和分支历史。美元费用来自模型价格记录，并非供应商账单。";
+    extensions.textContent = !state.connected ? "" : state.skillError ? (english ? "Skill load failed" : "Skill 加载异常")
+      : `${state.skills?.length ?? 0} Skills · ${state.extensionCommands ?? 0} ${english ? "extension commands" : "扩展指令"}`;
+    extensions.title = state.skillError || state.skills?.join("\n") || "";
+    extensions.classList.toggle("is-error", !!state.skillError);
+  };
+  const refreshHeaderGit = async () => {
+    if (!options.desktop || disposed || !cwd) return;
+    const generation = ++gitGeneration, root = cwd;
+    gitRoot = root; gitPending = true; gitBranch = ""; gitCount = 0; gitError = ""; refreshHeader();
+    try {
+      const result = await options.invoke<{ branch: string; changes: Change[] }>("git_changes", { root, mode: "working" });
+      if (disposed || generation !== gitGeneration || root !== cwd) return;
+      gitBranch = result.branch || "HEAD"; gitCount = result.changes.length;
+    } catch (error) {
+      if (disposed || generation !== gitGeneration || root !== cwd) return;
+      gitError = formatUserError(error);
+    } finally { if (!disposed && generation === gitGeneration) { gitPending = false; refreshHeader(); } }
+  };
   const unlisteners: (() => void)[] = [];
   let timer: ReturnType<typeof setTimeout> | undefined;
   let meta: Record<string, { pin?: boolean; archived?: boolean }> = {};
   try { meta = JSON.parse(read("pi.sessionPresentation") || "{}"); } catch { /* Use defaults. */ }
   if (!meta || typeof meta !== "object" || Array.isArray(meta)) meta = {};
   const input = el<HTMLTextAreaElement>("composer-input");
+  const commandSuggestions = el<HTMLDivElement>("composer-command-suggestions");
   const send = el<HTMLButtonElement>("composer-send");
   const composer = el("composer");
   const palette = el("command-palette");
@@ -118,8 +167,22 @@ export function setupWorkbench(options: Options) {
   const toolsToggle = el("work-tools-toggle");
   const fileEditor = el<HTMLTextAreaElement>("file-editor-text");
   const fileDirty = () => !!currentFile && fileEditor.value !== fileOriginal;
+  const selectAgent = (id: string) => {
+    if (!id || id === "main") {
+      if (!composer.hidden && !document.body.classList.contains("frame-hidden") && !document.body.classList.contains("terminal-view")) input.focus();
+      else options.focusTerminal();
+      return;
+    }
+    const target = [...document.querySelectorAll<HTMLElement>("[data-agent-session-id]")].find((node) => node.dataset.agentSessionId === id);
+    if (target) {
+      target.scrollIntoView({ behavior: "smooth", block: "center" });
+      target.focus?.();
+      return;
+    }
+    options.toast(options.language() === "en" ? "This Agent has no visible transcript yet." : "该 Agent 暂无可定位的结果。", 2600);
+  };
   const report = (error: unknown) => {
-    const message = String(error);
+    const message = formatUserError(error);
     options.toast(message, 5000);
     if (panel) { el("tool-message").textContent = message; el("tool-message").hidden = false; }
   };
@@ -128,13 +191,62 @@ export function setupWorkbench(options: Options) {
     input.style.height = `${Math.min(200, Math.max(56, input.scrollHeight))}px`;
     options.resize();
   };
+  const commandCatalog = () => {
+    const english = options.language() === "en";
+    const base = [
+      ["/new", english ? "Start a new session" : "新建会话"],
+      ["/model", english ? "Choose or switch model" : "选择或切换模型"],
+      ["/tree", english ? "Show the session tree" : "查看会话树"],
+      ["/fork", english ? "Fork the current session" : "创建分支会话"],
+      ["/compact", english ? "Compact the current context" : "压缩当前上下文"],
+      ["/reload", english ? "Reload Pi extensions" : "重载 Pi 扩展"],
+      ["/help", english ? "Show available Pi commands" : "查看可用 Pi 指令"],
+    ] as const;
+    return isClaude() ? base.filter(([command]) => command === "/new") : base;
+  };
+  let commandSuggestionIndex = 0;
+  const closeCommandSuggestions = () => {
+    commandSuggestions.hidden = true;
+    commandSuggestions.replaceChildren();
+    input.removeAttribute("aria-activedescendant");
+  };
+  const chooseCommandSuggestion = (command: string) => {
+    input.value = `${command} `;
+    input.setSelectionRange(input.value.length, input.value.length);
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    closeCommandSuggestions();
+    input.focus();
+  };
+  const refreshCommandSuggestions = () => {
+    const match = input.value.match(/^\s*(\/[^\s]*)$/);
+    if (!match || !state.ready || submitting || commandRunning) { closeCommandSuggestions(); return; }
+    const query = match[1].toLowerCase();
+    const choices = commandCatalog().filter(([command]) => command.startsWith(query));
+    if (!choices.length) { closeCommandSuggestions(); return; }
+    commandSuggestionIndex = Math.min(commandSuggestionIndex, choices.length - 1);
+    commandSuggestions.replaceChildren();
+    for (const [index, [command, description]] of choices.entries()) {
+      const item = document.createElement("button");
+      item.type = "button"; item.role = "option"; item.id = `composer-command-option-${index}`;
+      item.setAttribute("aria-selected", String(index === commandSuggestionIndex));
+      const code = document.createElement("code"); code.textContent = command;
+      const hint = document.createElement("small"); hint.textContent = description;
+      item.append(code, hint);
+      item.addEventListener("mousedown", event => event.preventDefault());
+      item.addEventListener("click", () => chooseCommandSuggestion(command));
+      commandSuggestions.append(item);
+    }
+    commandSuggestions.hidden = false;
+    input.setAttribute("aria-activedescendant", `composer-command-option-${commandSuggestionIndex}`);
+  };
   const saveDraft = () => store(draftKey, draft);
   const refreshComposer = () => {
     send.disabled = !canSubmit(state, draft, submitting, options.desktop);
-    el("composer-stop").hidden = !state.busy;
+    el("composer-stop").hidden = !state.busy && !state.inputRecovery && !submitting;
     el("queued-status").hidden = !state.pending;
-    el("agent-status").textContent = text(!options.desktop ? "preview" : submitting ? "submitting"
-      : !state.connected ? "disconnected" : !state.ready ? "blocked" : state.nativeDraft ? "nativeDraft" : state.busy ? "working" : "ready");
+    el("agent-status").textContent = text(!options.desktop ? "preview" : state.commandPending ? "submitting" : submitting ? "submitting"
+      : !state.connected ? "disconnected" : !state.ready ? state.startupPhase === "project_trust" ? "projectTrust"
+        : state.startupPhase === "initializing" ? "initializing" : "blocked" : state.nativeDraft ? "nativeDraft" : state.busy ? "working" : "ready");
     el("agent-status").dataset.state = state.busy ? "busy" : state.ready ? "ready" : "blocked";
     send.title = text("send");
     send.setAttribute("aria-label", send.title);
@@ -149,7 +261,7 @@ export function setupWorkbench(options: Options) {
       chip.title = path;
       chip.append(icon("file"));
       const label = document.createElement("span");
-      label.textContent = path.split("/").pop() || path;
+      label.textContent = path.split(/[\\/]/).pop() || path;
       chip.append(label, button("x", `${text("close")} ${label.textContent}`, () => {
         draft.attachments = draft.attachments.filter((value) => value !== path);
         saveDraft(); refreshAttachments(); refreshComposer(); options.resize();
@@ -158,24 +270,27 @@ export function setupWorkbench(options: Options) {
     }
   };
   const switchDraft = (key: string) => {
-    if (key === draftKey || submitting) return;
+    if (key === draftKey) return;
     saveDraft();
     draftKey = key;
     draft = parseDraft(read(key));
     input.value = draft.text;
     refreshAttachments(); refreshComposer(); autoHeight();
   };
-  const addPaths = (paths: string[]) => {
-    const valid = paths.filter((path) => path.startsWith("/") && !/[\0\r\n]/.test(path));
-    draft.attachments = [...new Set([...draft.attachments, ...valid])].slice(0, 20);
+  const addPaths = (paths: string[]): number => {
+    if (disposed) return 0;
+    const previousCount = draft.attachments.length;
+    draft.attachments = [...new Set([...draft.attachments, ...paths.filter(isAbsoluteAttachmentPath)])].slice(0, 20);
+    const added = draft.attachments.length - previousCount;
     saveDraft(); refreshAttachments(); refreshComposer(); composer.hidden = false;
     el("composer-toggle").setAttribute("aria-pressed", "true");
     el("composer-toggle").setAttribute("aria-checked", "true");
     syncPresentation();
     autoHeight(); input.focus();
+    return added;
   };
   const syncPresentation = () => {
-    if (!options.desktop || !bridgeId || !state.connected || !state.ready || disposed) return;
+    if (isClaude() || !options.desktop || !bridgeId || !state.connected || !state.ready || disposed) return;
     const mode = composer.hidden ? "native" : "compact";
     const key = `${bridgeId}:${mode}`;
     const matches = state.compactEditor === undefined || state.compactEditor === (mode === "compact");
@@ -193,17 +308,25 @@ export function setupWorkbench(options: Options) {
     if (bridgeId && incomingId && incomingId !== bridgeId) return;
     const next = normalizedState(value);
     if (state.busy && !next.busy && lastCompletion && !document.hasFocus()) {
-      options.toast(options.language() === "en" ? "Pi finished the task." : "Pi 已完成本次运行。");
+      options.toast(options.language() === "en" ? "The run ended; check its result before acceptance." : "本次运行已结束，请核对结果后验收。");
       if (notificationEnabled && "Notification" in window && Notification.permission === "granted") {
         new Notification("Pi", { body: options.language() === "en" ? "The current run has ended." : "当前运行已结束。", silent: true });
       }
     }
     if (next.busy) lastCompletion = true;
-    if (state.busy && !next.busy) { lastCompletion = false; if (panel === "review") void refreshPanel(); }
+    const started = !state.busy && next.busy;
+    const completed = state.busy && !next.busy;
+    if (completed) { lastCompletion = false; if (panel === "review") void refreshPanel(); }
     state = next;
     options.stateChanged?.(state);
     if (state.cwd) cwd = state.cwd;
-    switchDraft(`pi.guiDraft:${state.session || cwd || "initial"}`);
+    if (next.session && next.session !== progressSession) { progress.reset(); progressSession = next.session; }
+    progress.task(state.task, cwd);
+    if (started && !panel && cwd && !document.body.classList.contains("sidebar-open")) openPanel("work");
+    if (panel === "work") renderWorkPanel();
+    refreshHeader();
+    if (gitRoot !== cwd || completed) void refreshHeaderGit();
+    if (state.session) switchDraft(`${draftNamespace()}${state.session}`);
     refreshComposer();
     renderSidebarHistory();
     if (options.desktop && state.ready && state.session && recents.open && recentsLoadedFor !== state.session) {
@@ -214,7 +337,7 @@ export function setupWorkbench(options: Options) {
     syncPresentation();
     const model = el("current-model");
     if (state.model) { model.textContent = state.model; model.title = state.model; }
-    if (state.ready && options.desktop && automaticallyChecked !== bridgeId) {
+    if (!isClaude() && state.ready && options.desktop && automaticallyChecked !== bridgeId) {
       automaticallyChecked = bridgeId;
       const checkedBridge = bridgeId;
       void options.invoke<{checks: {ok: boolean}[]}>("run_diagnostics").then((result) => {
@@ -226,6 +349,7 @@ export function setupWorkbench(options: Options) {
     }
   };
   const executeCommand = async (command: string) => {
+    if (isClaude() && command !== "/new") throw new Error(options.language() === "en" ? "This command is only available in Pi." : "此指令仅适用于 Pi 引擎。");
     if (commandRunning) throw new Error(options.language() === "en" ? "A Pi command is still opening." : "上一条 Pi 指令仍在打开，请稍后。");
     if (fileDirty()) throw new Error(text("dirtyFile"));
     closePanel();
@@ -239,33 +363,75 @@ export function setupWorkbench(options: Options) {
   const submit = async (forceSteer = false, forceQueue = false) => {
     if (!canSubmit(state, draft, submitting, options.desktop)) return;
     const snapshot = { text: draft.text, attachments: [...draft.attachments] };
-    if (/^\s*[!/]/.test(snapshot.text)) {
+    if (/^\s*\//.test(snapshot.text)) {
+      if (snapshot.attachments.length) {
+        el("composer-error").hidden = false;
+        el("composer-error").textContent = options.language() === "en"
+          ? "Pi commands cannot be sent with file attachments."
+          : "Pi 指令不能与文件附件一起发送。";
+        return;
+      }
+      const submittedKey = draftKey;
+      let commandSucceeded = false;
+      submitting = true;
+      el("composer-error").hidden = true;
+      refreshComposer();
+      try {
+        await executeCommand(snapshot.text.trim());
+        commandSucceeded = true;
+        if (sameDraft(draft, snapshot) && draftKey === submittedKey) {
+          draft = { text: "", attachments: [] };
+          input.value = "";
+          saveDraft(); refreshAttachments(); autoHeight();
+        }
+      } catch (error) {
+        el("composer-error").hidden = false;
+        el("composer-error").textContent = formatUserError(error);
+      } finally {
+        submitting = false;
+        if (state.session || cwd) switchDraft(`${draftNamespace()}${state.session || cwd}`);
+        refreshComposer();
+        if (commandSucceeded) options.focusTerminal();
+        else if (!composer.hidden) input.focus();
+      }
+      return;
+    }
+    if (/^\s*!/.test(snapshot.text)) {
       el("composer-error").hidden = false;
       el("composer-error").textContent = options.language() === "en"
-        ? "Use the command palette for Pi commands, or the native terminal for shell commands."
-        : "Pi 指令请从指令面板执行；终端命令请使用原版输入框。";
+        ? "Use the native terminal for shell commands."
+        : "终端命令请使用原版输入框。";
       return;
     }
     const message = [snapshot.text.trim(), ...snapshot.attachments.map(toReference)].filter(Boolean).join("\n");
     const submittedKey = draftKey;
+    const mode = forceQueue ? "queue" : forceSteer ? "control" : options.mode();
     submitting = true;
     el("composer-error").hidden = true;
     refreshComposer();
     try {
-      await options.invoke("gui_action", { action: "submit", text: message, mode: forceQueue ? "queue" : forceSteer ? "control" : options.mode() });
+      preparingSubmission = true;
+      try { if (options.beforeSubmit) await options.beforeSubmit(snapshot.text); }
+      finally { preparingSubmission = false; }
+      // Render the user turn before dispatching so a fast runtime response
+      // cannot appear above its originating message.
+      options.conversationSubmit?.(snapshot.text.trim(), snapshot.attachments);
+      await options.invoke("gui_action", { action: "submit", text: message, attachments: snapshot.attachments, userText: snapshot.text.trim(), mode });
       if (sameDraft(draft, snapshot) && draftKey === submittedKey) {
         draft = { text: "", attachments: [] };
         input.value = "";
         saveDraft(); refreshAttachments(); autoHeight();
-      } else {
-        store(submittedKey, draft);
+      } else if (draftKey !== submittedKey && sameDraft(parseDraft(read(submittedKey)), snapshot)) {
+        // Auto may route an idle submission to the other engine. Only consume
+        // the original unchanged draft; never overwrite the new engine's input.
+        store(submittedKey, { text: "", attachments: [] });
       }
     } catch (error) {
       el("composer-error").hidden = false;
-      el("composer-error").textContent = String(error);
+      el("composer-error").textContent = formatUserError(error);
     } finally {
       submitting = false;
-      if (state.session || cwd) switchDraft(`pi.guiDraft:${state.session || cwd}`);
+      if (state.session || cwd) switchDraft(`${draftNamespace()}${state.session || cwd}`);
       refreshComposer();
       if (!composer.hidden) input.focus(); else options.focusTerminal();
     }
@@ -273,10 +439,31 @@ export function setupWorkbench(options: Options) {
   input.value = draft.text;
   input.addEventListener("input", () => {
     draft.text = input.value; saveDraft(); autoHeight(); refreshComposer();
+    el("composer-error").hidden = true;
+    commandSuggestionIndex = 0;
+    refreshCommandSuggestions();
   });
   input.addEventListener("compositionstart", () => { composing = true; });
   input.addEventListener("compositionend", () => { composing = false; });
   input.addEventListener("keydown", (event) => {
+    if (composing || event.isComposing || event.keyCode === 229) return;
+    if (!commandSuggestions.hidden) {
+      const options = [...commandSuggestions.querySelectorAll<HTMLButtonElement>("button")];
+      if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+        event.preventDefault();
+        commandSuggestionIndex = Math.max(0, Math.min(options.length - 1, commandSuggestionIndex + (event.key === "ArrowDown" ? 1 : -1)));
+        options.forEach((item, index) => item.setAttribute("aria-selected", String(index === commandSuggestionIndex)));
+        input.setAttribute("aria-activedescendant", `composer-command-option-${commandSuggestionIndex}`);
+        return;
+      }
+      if (event.key === "Enter" || event.key === "Tab") {
+        event.preventDefault();
+        const command = options[commandSuggestionIndex]?.querySelector("code")?.textContent;
+        if (command) chooseCommandSuggestion(command);
+        return;
+      }
+      if (event.key === "Escape") { event.preventDefault(); closeCommandSuggestions(); return; }
+    }
     if (options.matchesShortcut && !composing && !event.isComposing && event.keyCode !== 229) {
       if (options.matchesShortcut("tui.input.newLine", event)) {
         if (event.key !== "Enter") {
@@ -292,10 +479,12 @@ export function setupWorkbench(options: Options) {
       const queue = options.matchesShortcut("app.message.followUp", event);
       if (!options.matchesShortcut("tui.input.submit", event) && !queue && !steer) return;
       event.preventDefault();
+      if (event.repeat) return;
       void submit(steer, queue);
     } else if (shouldSendOnEnter(event, composing)) {
       event.preventDefault();
-      void submit(event.metaKey || event.ctrlKey);
+      if (event.repeat) return;
+      void submit(event.metaKey || event.ctrlKey, event.altKey);
     }
   });
   composer.addEventListener("paste", (event) => {
@@ -326,6 +515,7 @@ export function setupWorkbench(options: Options) {
     void options.invoke("gui_action", { action: "stop" }).catch(report);
   });
   const toggleComposer = () => {
+    if (isClaude()) { composer.hidden = false; input.focus(); return; }
     composer.hidden = !composer.hidden;
     store("pi.guiComposer", !composer.hidden);
     el("composer-toggle").setAttribute("aria-pressed", String(!composer.hidden));
@@ -362,7 +552,7 @@ export function setupWorkbench(options: Options) {
   const closePanel = () => {
     if (fileDirty()) { report(text("dirtyFile")); return; }
     panel = undefined; generation++;
-    el("tool-panel").hidden = true; options.resize();
+    el("tool-panel").hidden = true; el("work-open").setAttribute("aria-expanded", "false"); options.resize();
   };
   const empty = (list: HTMLElement, message: string) => {
     const label = document.createElement("div");
@@ -374,15 +564,16 @@ export function setupWorkbench(options: Options) {
     panel = view; generation++;
     options.panelOpened();
     el("tool-panel").hidden = false;
+    el("work-open").setAttribute("aria-expanded", String(view === "work"));
     el("tool-panel-title").textContent = text(view);
-    for (const name of ["files", "history", "review", "diagnostics"]) el(`${name}-view`).hidden = name !== view;
+    for (const name of ["work", "files", "history", "review", "diagnostics"]) el(`${name}-view`).hidden = name !== view;
     el("tool-message").hidden = true;
     options.resize(); void refreshPanel();
   };
-  const requireSwitch = () => {
+  const requireSwitch = (forSubmission = false) => {
     if (switching) throw new Error(options.language() === "en" ? "A session switch is in progress." : "正在切换会话，请稍后。");
-    if (submitting) throw new Error(text("pendingDraft"));
-    if (state.busy || state.nativeDraft) throw new Error(options.language() === "en"
+    if (submitting && !(forSubmission && preparingSubmission)) throw new Error(text("pendingDraft"));
+    if (state.busy || state.nativeDraft || state.commandPending || state.inputRecovery) throw new Error(options.language() === "en"
       ? "Stop the current task and resolve the terminal draft before switching." : "请先停止当前任务并处理终端草稿，再切换。");
     if (fileDirty()) throw new Error(text("dirtyFile"));
   };
@@ -467,13 +658,14 @@ export function setupWorkbench(options: Options) {
   };
   const loadSessions = () => {
     if (sessionsLoading) return sessionsLoading;
-    sessionsLoading = options.invoke<{ sessions: Session[] }>("list_sessions").then((result) => {
-      if (disposed) return;
+    const engine = options.engine?.() || "pi";
+    const loading = options.invoke<{ sessions: Session[] }>("list_sessions").then((result) => {
+      if (disposed || engine !== (options.engine?.() || "pi")) return;
       sessions = result.sessions;
       renderSidebarHistory();
       if (panel === "history") renderHistory();
-    }).finally(() => { sessionsLoading = undefined; });
-    return sessionsLoading;
+    }).finally(() => { if (sessionsLoading === loading) sessionsLoading = undefined; });
+    sessionsLoading = loading; return loading;
   };
   recents.addEventListener("toggle", () => {
     store("pi.historyCollapsed", !recents.open);
@@ -484,10 +676,17 @@ export function setupWorkbench(options: Options) {
     if (fileDirty()) throw new Error(text("dirtyFile"));
     const key = ++fileGeneration;
     const root = cwd;
+    const runtime = runtimeVersion; const view = generation; const editVersion = fileEditVersion;
     const value = await options.invoke<{ text: string; revision: string }>("read_workspace_file", { root, path });
-    if (key !== fileGeneration || root !== cwd || disposed) return;
-    currentFile = path; fileRevision = value.revision; fileOriginal = value.text;
-    fileEditor.value = value.text;
+    if (key !== fileGeneration || root !== cwd || disposed || runtime !== runtimeVersion || view !== generation) return;
+    // The old editor stays usable during the read. Never replace edits made while awaiting it,
+    // even if a concurrent save has since made those edits clean.
+    if (fileDirty()) throw new Error(text("dirtyFile"));
+    if (editVersion !== fileEditVersion) return;
+    fileDocument++;
+    currentFile = path; fileRevision = value.revision; fileOriginal = normalizeFileText(value.text);
+    fileNativeOriginal = fileNativeText = value.text;
+    fileEditor.value = fileOriginal;
     el("file-editor-name").textContent = path; el("file-editor-name").title = path;
     el("file-editor").hidden = false;
     el<HTMLButtonElement>("file-save").disabled = true;
@@ -526,25 +725,33 @@ export function setupWorkbench(options: Options) {
     }
     if (!files.length) empty(list, text("noFiles"));
   };
-  fileEditor.addEventListener("input", () => { el<HTMLButtonElement>("file-save").disabled = !fileDirty(); });
+  fileEditor.addEventListener("input", () => {
+    fileEditVersion++;
+    fileNativeText = fileEditor.value === fileOriginal ? fileNativeOriginal : preserveFileLineEndings(fileNativeText, fileEditor.value);
+    el<HTMLButtonElement>("file-save").disabled = saving || !fileDirty();
+  });
   // A second save while one is in flight would reuse the old revision and be rejected as an external edit.
   let saving = false;
   const saveFile = async () => {
-    if (saving || !currentFile || !fileDirty()) return;
+    if (disposed || saving || !currentFile || !fileDirty()) return;
     const root = cwd; const path = currentFile; const snapshot = fileEditor.value;
+    const document = fileDocument; const runtime = runtimeVersion;
+    const nativeSnapshot = preserveFileLineEndings(fileNativeText, snapshot);
+    fileNativeText = nativeSnapshot;
     const save = el<HTMLButtonElement>("file-save"); save.disabled = true;
     saving = true;
     try {
-      const value = await options.invoke<string>("save_workspace_file", { root, path, text: snapshot, expectedRevision: fileRevision });
-      if (path === currentFile && root === cwd) { fileRevision = value; fileOriginal = snapshot; }
+      const value = await options.invoke<string>("save_workspace_file", { root, path, text: nativeSnapshot, expectedRevision: fileRevision });
+      if (disposed || document !== fileDocument || runtime !== runtimeVersion || path !== currentFile || root !== cwd) return;
+      fileRevision = value; fileOriginal = snapshot; fileNativeOriginal = nativeSnapshot;
       options.toast(text("saved"));
-    } finally { saving = false; save.disabled = !fileDirty(); }
+    } finally { saving = false; if (!disposed) save.disabled = !fileDirty(); }
   };
   el("file-save").addEventListener("click", () => { void saveFile().catch(report); });
   el("file-reference").addEventListener("click", () => { if (currentFile) addPaths([`${cwd}/${currentFile}`]); });
   el("file-editor-close").addEventListener("click", () => {
     if (fileDirty() && !window.confirm(text("discard"))) return;
-    fileGeneration++; currentFile = ""; fileOriginal = "";
+    fileGeneration++; fileDocument++; currentFile = ""; fileOriginal = fileNativeOriginal = fileNativeText = "";
     el("file-editor").hidden = true;
   });
   const openDiff = async (change: Change) => {
@@ -595,6 +802,7 @@ export function setupWorkbench(options: Options) {
     });
     if (root !== cwd || disposed || mode !== el<HTMLSelectElement>("review-mode").value) return;
     changes = result.changes;
+    if (mode !== "branch") { gitGeneration++; gitPending = false; gitRoot = root; gitBranch = result.branch || "HEAD"; gitCount = changes.length; gitError = ""; refreshHeader(); }
     el("change-count").textContent = changes.length ? String(changes.length) : "";
     el("review-branch").textContent = result.branch || "HEAD";
     const previous = baseSelect.value;
@@ -628,7 +836,7 @@ export function setupWorkbench(options: Options) {
     const video = el<HTMLVideoElement>("wallpaper");
     checks.push({ name: options.language() === "en" ? "Native wallpaper player" : "原生壁纸播放器",
       ok: video.autoplay && video.loop && video.muted && video.playsInline && !video.error,
-      detail: video.error ? String(video.error.message) : options.language() === "en" ? "Native video / image, no frame conversion" : "原生视频 / 图片，没有逐帧转换" });
+      detail: video.error ? formatUserError(video.error.message) : options.language() === "en" ? "Native video / image, no frame conversion" : "原生视频 / 图片，没有逐帧转换" });
     const terminalBounds = el("terminal-stage").getBoundingClientRect();
     const inputBounds = composer.getBoundingClientRect();
     const visible = inputBounds.width > 0 && inputBounds.height > 0;
@@ -663,14 +871,100 @@ export function setupWorkbench(options: Options) {
     const view = panel; const version = generation;
     el("tool-message").hidden = true;
     try {
-      if (!cwd && view !== "diagnostics") throw new Error(text("disconnected"));
-      if (view === "files") await renderFiles();
+      if (!cwd && view !== "diagnostics" && view !== "work") throw new Error(text("disconnected"));
+      if (view === "work") renderWorkPanel();
+      else if (view === "files") await renderFiles();
       else if (view === "history") await loadSessions();
       else if (view === "review") await loadChanges();
       else if (view === "diagnostics") await diagnostics();
     } catch (error) { if (view === panel && version === generation) report(error); }
   }
-  for (const view of ["files", "history", "review", "diagnostics"] as const) el(`${view}-open`).addEventListener("click", () => openPanel(view));
+  const renderWorkPanel = () => {
+    const stateLabel = state.busy ? text("working") : state.connected ? text("ready") : text("disconnected");
+    const stateNode = el("work-panel-state");
+    const dot = el("work-panel-dot");
+    stateNode.textContent = stateLabel;
+    dot.className = state.busy ? "is-running" : state.connected ? "is-complete" : "is-error";
+    el("work-panel-task").textContent = state.busy
+      ? (options.language() === "en" ? "The current task is running. You can keep reading the answer while monitoring progress here." : "当前任务正在运行，可继续查看回答，并在这里监控进度。")
+      : (options.language() === "en" ? "No active task. Start a message to monitor it here." : "当前没有运行中的任务，发送消息后将在这里显示进度。");
+    const task = state.task && typeof state.task === "object" ? state.task as { events?: { type?: string; note?: string }[] } : undefined;
+    const notes = Array.isArray(task?.events) ? task.events.filter(event => event?.type === "checkpoint" && typeof event.note === "string") : [];
+    const checkpoint = notes[notes.length - 1];
+    if (checkpoint?.note) el("work-panel-task").textContent = checkpoint.note.slice(0, 500);
+    el("work-panel-model").textContent = state.model || "—";
+    el("work-panel-usage").textContent = state.usage
+      ? `${state.usage.tokens.toLocaleString()} tokens${state.usage.cost === null ? "" : ` · $${state.usage.cost.toFixed(4)}`}` : "—";
+    el("work-panel-cwd").textContent = cwd || "—";
+    const snapshot = progress.snapshot(), english = options.language() === "en";
+    const list = el("work-progress-list");
+    const signature = JSON.stringify(snapshot);
+    if (list.dataset.signature !== signature + options.language()) {
+      list.dataset.signature = signature + options.language(); list.replaceChildren();
+      el("work-progress-count").textContent = snapshot.steps.length ? `${snapshot.steps.filter(step => step.status === "completed").length}/${snapshot.steps.length}` : "";
+      for (const step of snapshot.steps) {
+        const row = document.createElement("li"); row.dataset.status = step.status;
+        const mark = document.createElement("span"); mark.className = "work-step-mark"; mark.setAttribute("aria-label", step.status);
+        mark.append(icon(step.status === "completed" ? "check" : step.status === "failed" ? "x" : "circle"));
+        const label = document.createElement("span"); label.textContent = step.title;
+        row.append(mark, label); list.append(row);
+      }
+      if (!snapshot.steps.length) empty(list, english ? "Waiting for a plan or tool activity." : "等待任务计划或工具执行记录。");
+    }
+    const artifacts = el("work-artifact-list");
+    const more = el<HTMLButtonElement>("work-artifact-more");
+    if (snapshot.artifacts.length <= 5) artifactsExpanded = false;
+    const artifactsSignature = `${JSON.stringify(snapshot.artifacts)}:${english}:${artifactsExpanded}`;
+    if (artifacts.dataset.signature !== artifactsSignature) {
+      artifacts.dataset.signature = artifactsSignature;
+      artifacts.replaceChildren();
+      const visibleArtifacts = artifactsExpanded ? snapshot.artifacts : snapshot.artifacts.slice(0, 5);
+      for (const path of visibleArtifacts) {
+        const wrapper = document.createElement("div"); wrapper.className = "work-artifact-row";
+        const row = document.createElement("button"); row.type = "button"; row.className = "file-row"; row.title = path;
+        const label = document.createElement("span"); label.textContent = path;
+        row.append(icon("file"), label);
+        const reveal = () => options.invoke("reveal_workspace_file", { root: cwd, path }).catch(report);
+        row.addEventListener("click", () => {
+          if (/\.(?:md|txt|json|jsonl|ya?ml|toml|csv|tsv|log|[cm]?[jt]sx?|css|html?|rs|py|sh|swift|xml|sql)$/i.test(path)) {
+            openPanel("files"); void openFile(path).catch(report);
+          } else void reveal();
+        });
+        const locate = document.createElement("button"); locate.type = "button"; locate.className = "icon-button";
+        locate.title = english ? "Show in file manager" : "在文件管理器中显示"; locate.setAttribute("aria-label", locate.title);
+        locate.append(icon("folder-open")); locate.addEventListener("click", () => { void reveal(); });
+        wrapper.append(row, locate); artifacts.append(wrapper);
+      }
+      if (!snapshot.artifacts.length) empty(artifacts, english ? "Files appear after successful writes." : "文件成功生成后显示在这里。");
+    }
+    el("work-artifact-count").textContent = snapshot.artifacts.length ? String(snapshot.artifacts.length) : "";
+    more.hidden = snapshot.artifacts.length <= 5;
+    more.setAttribute("aria-expanded", String(artifactsExpanded));
+    more.textContent = artifactsExpanded
+      ? text("showLessArtifacts")
+      : `${text("showMoreArtifacts")} (${Math.max(0, snapshot.artifacts.length - 5)})`;
+    for (const [key, zh, en] of [["overview", "概览", "Overview"], ["progress", "任务进程", "Task progress"], ["artifacts", "产物", "Artifacts"], ["details", "运行详情", "Run details"]]) {
+      el("work-view").querySelector<HTMLElement>(`[data-work-label="${key}"]`)!.textContent = english ? en : zh;
+    }
+    const agents = el("work-panel-agents"); agents.replaceChildren();
+    for (const agent of state.agents || []) {
+      const row = document.createElement("div"); row.className = `work-panel-agent${agent.status === "running" ? " is-running" : ""}`;
+      const dot = document.createElement("span");
+      const label = document.createElement("span"); label.textContent = agent.label || agent.id || "Agent";
+      const status = document.createElement("small"); status.textContent = agent.status || "";
+      row.append(dot, label, status); agents.append(row);
+    }
+    el<HTMLButtonElement>("work-panel-stop").disabled = !state.busy;
+  };
+  el("work-artifact-more").addEventListener("click", () => {
+    artifactsExpanded = !artifactsExpanded;
+    renderWorkPanel();
+  });
+  for (const view of ["work", "files", "history", "review", "diagnostics"] as const) el(`${view}-open`).addEventListener("click", () => {
+    if (view === "work" && panel === "work") closePanel(); else openPanel(view);
+  });
+  el("work-panel-stop").addEventListener("click", () => { void options.invoke("gui_action", { action: "stop" }).catch(report); });
+  el("work-panel-focus").addEventListener("click", () => { closePanel(); options.focusTerminal(); });
   el("workspace-choose").addEventListener("click", () => { void openWorkspace().catch(report); });
   el("tool-close").addEventListener("click", closePanel);
   el("tool-refresh").addEventListener("click", () => { void refreshPanel(); });
@@ -695,11 +989,11 @@ export function setupWorkbench(options: Options) {
     const actions: Action[] = [
       { title: text("new"), symbol: "square-pen", run: () => { void executeCommand("/new").catch(report); } },
       { title: text("workspace"), symbol: "folder-open", run: () => { void openWorkspace().catch(report); } },
-      ...(["files", "history", "review", "diagnostics"] as Panel[]).map((view) => ({
+      ...(["work", "files", "history", "review", "diagnostics"] as Panel[]).map((view) => ({
         title: text(view), symbol: view === "review" ? "git-pull-request" : view === "diagnostics" ? "shield-check" : view,
         run: () => openPanel(view),
       })),
-      ...(["model", "tree", "fork", "compact", "reload"] as const).map((command) => ({
+      ...(isClaude() ? [] : ["model", "tree", "fork", "compact", "reload"] as const).map((command) => ({
         title: text(command), symbol: command === "model" ? "box" : "git-branch",
         run: () => { void executeCommand(`/${command}`).catch(report); },
       })),
@@ -770,7 +1064,7 @@ export function setupWorkbench(options: Options) {
       }
       return;
     }
-    if (!el("settings-panel").hidden || event.isComposing || event.repeat) return;
+    if (document.querySelector(".claude-view-modal") || !el("settings-panel").hidden || event.isComposing || event.repeat) return;
     const match = (id: string, key: string) => options.matchesShortcut
       ? options.matchesShortcut(id, event) : isGuiShortcut(event) && event.key.toLowerCase() === key;
     if (match("gui.palette", "k")) { event.preventDefault(); event.stopImmediatePropagation(); openPalette(); }
@@ -781,6 +1075,7 @@ export function setupWorkbench(options: Options) {
   };
   document.addEventListener("keydown", keyboard, true);
   const refreshStrings = () => {
+    refreshHeader();
     renderSidebarHistory();
     document.querySelectorAll<HTMLElement>("[data-feature]").forEach((element) => { element.textContent = text(element.dataset.feature!); });
     for (const [id, key] of Object.entries({
@@ -788,9 +1083,11 @@ export function setupWorkbench(options: Options) {
       "palette-open": "palette", "palette-close": "close", "tool-refresh": "refresh", "tool-close": "close",
       "file-save": "save", "file-reference": "reference", "file-editor-close": "close", "archive-toggle": "archived",
       "workspace-choose": "workspace",
+      "work-open": "work",
       "work-tools-toggle": "workTools", "work-tools-settings": "settings",
     })) { const element = el(id); element.title = text(key); element.setAttribute("aria-label", text(key)); }
-    input.placeholder = text("placeholder"); input.setAttribute("aria-label", text("placeholder"));
+    const placeholder = isClaude() ? (options.language() === "en" ? "Message Agent…" : "向 Agent 发送消息…") : text("placeholder");
+    input.placeholder = placeholder; input.setAttribute("aria-label", placeholder);
     for (const [id, key] of [["file-search", "searchFiles"], ["history-search", "searchSessions"], ["palette-search", "searchCommands"]]) {
       el<HTMLInputElement>(id).placeholder = text(key); el(id).setAttribute("aria-label", text(key));
     }
@@ -798,20 +1095,32 @@ export function setupWorkbench(options: Options) {
     const scope = el<HTMLSelectElement>("history-scope"); scope.options[0].textContent = text("currentWorkspace"); scope.options[1].textContent = text("allWorkspaces");
     const mode = el<HTMLSelectElement>("review-mode"); mode.options[0].textContent = text("workingTree"); mode.options[1].textContent = text("staged");
     mode.options[2].textContent = text("branch");
-    if (panel) el("tool-panel-title").textContent = text(panel);
+    if (panel) { el("tool-panel-title").textContent = text(panel); if (panel === "work") renderWorkPanel(); }
     refreshComposer();
   };
   if (options.desktop) {
-    void listen("pi-gui-state", (event) => setState(event.payload)).then((unlisten) => {
+    void listen("pi-gui-state", (event) => { if (!isClaude()) setState(event.payload); }).then((unlisten) => {
       if (disposed) unlisten(); else unlisteners.push(unlisten);
     }).catch(report);
-    void listen<{ message: string }>("pi-gui-error", (event) => report(event.payload.message)).then((unlisten) => {
+    void listen<{ message: string; bridgeId?: string }>("pi-gui-error", (event) => {
+      if (!isClaude() && (!bridgeId || !event.payload.bridgeId || event.payload.bridgeId === bridgeId)) report(event.payload.message);
+    }).then((unlisten) => {
       if (disposed) unlisten(); else unlisteners.push(unlisten);
     }).catch(report);
   }
   refreshStrings(); refreshAttachments(); autoHeight();
   return {
-    addPaths, setState, refreshStrings, executeCommand,
+    observeEvent(value: unknown) { if (disposed) return; progress.event(value, cwd); if (panel === "work") renderWorkPanel(); },
+    addPaths, setState, refreshStrings, executeCommand, requireSwitch, selectAgent,
+    getState: () => state,
+    engineChanged() {
+      progress.reset(); progressSession = "";
+      bridgeId = ""; sessions = []; recentsSignature = ""; recentsLoadedFor = ""; sessionsLoading = undefined;
+      state = {ready:false,busy:false,connected:false};
+      switchDraft(`${draftNamespace()}${cwd || "initial"}`);
+      if (isClaude()) composer.hidden = false;
+      refreshStrings(); renderSidebarHistory();
+    },
     async dismissSelector() {
       options.prepareCommand?.();
       const result = await options.invoke<{dismissed: boolean}>("gui_action", {action: "dismiss"});
@@ -819,25 +1128,30 @@ export function setupWorkbench(options: Options) {
       return result.dismissed;
     },
     focusInput() {
-      if (!composer.hidden && !document.body.classList.contains("frame-hidden") && !document.body.classList.contains("hide-terminal")
+      if (!composer.hidden && !document.body.classList.contains("frame-hidden") && !document.body.classList.contains("terminal-view")
         && state.ready && !state.nativeDraft) input.focus();
       else options.focusTerminal();
     },
     setRuntime(info: { cwd: string; bridgeId?: string }) {
+      if (info.cwd !== cwd || info.bridgeId !== bridgeId) { progress.reset(); progressSession = ""; }
+      runtimeVersion++;
       cwd = info.cwd;
+      void refreshHeaderGit();
       bridgeId = info.bridgeId || "";
       presentationKey = ""; presentationPending = "";
-      switchDraft(`pi.guiDraft:${cwd}`);
+      switchDraft(`${draftNamespace()}${cwd}`);
       syncPresentation();
     },
-    disconnected() { setState({ ready: false, busy: false, connected: false }); },
+    runtimeId: () => bridgeId,
+    disconnected() { runtimeVersion++; setState({ ready: false, busy: false, connected: false }); },
     async synchronize() {
-      if (options.desktop) setState(await options.invoke("gui_status"));
+      const version = runtimeVersion;
+      if (options.desktop) { const value = await options.invoke("gui_status"); if (!disposed && version === runtimeVersion) setState(value); }
     },
     openDiagnostics: () => openPanel("diagnostics"),
     dispose() {
       disposed = true; saveDraft(); clearTimeout(timer);
-      generation++; fileGeneration++; refreshGeneration++;
+      generation++; fileGeneration++; refreshGeneration++; gitGeneration++;
       unlisteners.forEach((unlisten) => unlisten()); document.removeEventListener("keydown", keyboard, true);
       document.removeEventListener("pointerdown", outsideTools, true);
     },

@@ -1,12 +1,13 @@
 import {
   createElement, ArrowDownToLine, ArrowUp, ArrowUpRight, Blocks, Box, Brain,
   ChevronDown, ChevronRight, Download, Eye, EyeOff, FilePlus2, FolderOpen,
-  GitBranch, HardDrive, History, Image, Keyboard, ListEnd, LogIn, Minus,
-  Palette, PanelLeft, Pencil, Plus, RefreshCw, RotateCcw, Search, Settings2,
-  ShieldCheck, SlidersHorizontal, SquarePen, SquareTerminal, Trash2, Unplug,
+  GitBranch, HardDrive, History, Image, Keyboard, List, ListEnd, ListTree, LogIn, Minus,
+  Palette, PanelLeft, PanelRight, Pencil, Plus, RefreshCw, RotateCcw, Search, Settings2,
+  ShieldCheck, ShieldAlert, Circle, SlidersHorizontal, SquarePen, SquareTerminal, Trash2, Unplug,
   Upload, X, Minimize2, Maximize, Minimize, PanelTopClose, PanelTopOpen, Type, Sun, Moon, type IconNode,
   Paperclip, Slash, Square, TextCursorInput, Files, File, Folder, AtSign, Save, Pin, Archive,
-  Check, CircleAlert, GitPullRequest, Command, Bot, Wrench, NotebookPen,
+  Check, CircleAlert, GitPullRequest, Command, Bot, Wrench, NotebookPen, Volume2, Store, Cpu, Plug,
+  Copy, MoreHorizontal, Sparkles,
 } from "lucide";
 
 const icons: Record<string, IconNode> = {
@@ -15,10 +16,11 @@ const icons: Record<string, IconNode> = {
   "chevron-down": ChevronDown, "chevron-right": ChevronRight, download: Download,
   eye: Eye, "eye-off": EyeOff, "file-plus-2": FilePlus2, "folder-open": FolderOpen,
   "git-branch": GitBranch, "hard-drive": HardDrive, history: History, image: Image,
-  keyboard: Keyboard, "list-end": ListEnd, "log-in": LogIn, minus: Minus,
-  palette: Palette, "panel-left": PanelLeft, pencil: Pencil, plus: Plus,
+  keyboard: Keyboard, list: List, "list-end": ListEnd, "list-tree": ListTree,
+  "log-in": LogIn, minus: Minus,
+  palette: Palette, "panel-left": PanelLeft, "panel-right": PanelRight, pencil: Pencil, plus: Plus,
   "refresh-cw": RefreshCw, "rotate-ccw": RotateCcw, search: Search,
-  "settings-2": Settings2, "shield-check": ShieldCheck,
+  "settings-2": Settings2, "shield-check": ShieldCheck, "shield-alert": ShieldAlert, circle: Circle,
   "sliders-horizontal": SlidersHorizontal, "square-pen": SquarePen,
   "terminal-square": SquareTerminal, "trash-2": Trash2, unplug: Unplug,
   upload: Upload, x: X, "minimize-2": Minimize2, maximize: Maximize, minimize: Minimize,
@@ -27,8 +29,15 @@ const icons: Record<string, IconNode> = {
   paperclip: Paperclip, slash: Slash, square: Square, "text-cursor-input": TextCursorInput,
   files: Files, file: File, folder: Folder, "at-sign": AtSign, save: Save, pin: Pin, archive: Archive,
   check: Check, "circle-alert": CircleAlert, "git-pull-request": GitPullRequest, command: Command,
-  bot: Bot, wrench: Wrench, "notebook-pen": NotebookPen,
+  bot: Bot, wrench: Wrench, "notebook-pen": NotebookPen, "volume-2": Volume2, store: Store, cpu: Cpu, plug: Plug,
+  copy: Copy,
+  sparkles: Sparkles,
+  "more-horizontal": MoreHorizontal,
 };
+
+export function hasIcon(name: string): boolean {
+  return Object.prototype.hasOwnProperty.call(icons, name);
+}
 
 export function icon(name: string): SVGElement {
   return createElement(icons[name] || SquareTerminal, {

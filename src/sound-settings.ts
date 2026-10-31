@@ -90,21 +90,46 @@ export function setupSoundSettings(options: {
   };
   document.addEventListener("click", click, true);
   const audible = () => !disposed && !document.hidden && !document.body.dataset.keyRecording && preferences.enabled && preferences.volume > 0;
+  let lastTypingAt = -Infinity;
+  let lastBeforeInput: { target: EventTarget | null; at: number } | undefined;
+  const playTyping = () => {
+    const now = performance.now();
+    if (now - lastTypingAt < 38) return;
+    lastTypingAt = now;
+    void player.play("typing");
+  };
   const typing = (event: Event) => {
-    if (event.isTrusted && audible() && preferences.typing && isTypingInput(event as InputEvent)) void player.play("typing");
+    if (!event.isTrusted) return;
+    lastBeforeInput = { target: event.target, at: performance.now() };
+    if (audible() && preferences.typing && isTypingInput(event as InputEvent)) playTyping();
+  };
+  const typingFallback = (event: Event) => {
+    if (!event.isTrusted) return;
+    const preceding = lastBeforeInput;
+    lastBeforeInput = undefined;
+    if (preceding?.target === event.target && performance.now() - preceding.at < 150) return;
+    if (audible() && preferences.typing && isTypingInput(event as InputEvent)) playTyping();
   };
   const nativeKey = (event: KeyboardEvent) => {
-    if (event.isTrusted && audible() && preferences.typing && isNativeTypingKey(event)) void player.play("typing");
+    const typingKey = event.key.length === 1 || event.key === "Backspace" || event.key === "Delete";
+    if (event.isTrusted && typingKey && audible() && preferences.typing && (isNativeTypingKey(event)
+      || (!event.ctrlKey && !event.metaKey && !event.altKey && !event.isComposing
+        && isTypingInput({ target: event.target, inputType: event.key === "Backspace" || event.key === "Delete" ? "deleteContentBackward" : "insertText" } as InputEvent)))) playTyping();
   };
-  let lastWheelCheck = -Infinity;
+  let wheelLocked = false;
+  let wheelUnlockTimer: ReturnType<typeof setTimeout> | undefined;
   const wheel = (event: WheelEvent) => {
     if (!event.isTrusted || !audible() || !preferences.scroll || event.ctrlKey || (!event.deltaX && !event.deltaY)) return;
-    const now = performance.now();
-    if (now - lastWheelCheck < 110) return;
-    lastWheelCheck = now;
+    if (wheelLocked) return;
     if (canScrollTarget(event.target, event.deltaX, event.deltaY, options.terminalCanScroll)) void player.play("scroll");
+    wheelLocked = true;
+    wheelUnlockTimer = setTimeout(() => {
+      wheelLocked = false;
+      wheelUnlockTimer = undefined;
+    }, 110);
   };
   document.addEventListener("beforeinput", typing, true);
+  document.addEventListener("input", typingFallback, true);
   document.addEventListener("keydown", nativeKey, true);
   document.addEventListener("wheel", wheel, { capture: true, passive: true });
   for (const [control, key, event] of [[typingToggle, "typing", "typing"], [scrollToggle, "scroll", "scroll"]] as const) {
@@ -198,8 +223,12 @@ export function setupSoundSettings(options: {
     refreshLanguage: render,
     dispose() {
       disposed = true; generation++;
+      if (wheelUnlockTimer) clearTimeout(wheelUnlockTimer);
+      wheelUnlockTimer = undefined;
+      wheelLocked = false;
       document.removeEventListener("click", click, true);
       document.removeEventListener("beforeinput", typing, true);
+      document.removeEventListener("input", typingFallback, true);
       document.removeEventListener("keydown", nativeKey, true);
       document.removeEventListener("wheel", wheel, true);
       player.dispose();
