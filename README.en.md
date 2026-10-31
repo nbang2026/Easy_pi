@@ -44,7 +44,7 @@ It brings model connections, project sessions, files, Git review, Agent / Skill 
 > Building and uploading are separate steps. A new package absent from Releases is not publicly downloadable there. GitHub-generated source ZIPs and source-with-environment kits are not application installers.
 
 > [!WARNING]
-> **Publication check, October 31, 2026:** The supplied Windows PiRepair3 installer and source ZIP are truncated and excluded from this release. Windows assets are pending intact files and verification; the download entry does not imply a valid Windows asset is currently available.
+> **Publication check, October 31, 2026:** This release currently provides macOS assets. Archive-structure and declared-length checks on the local Windows PiRepair3 copies remain unresolved, and Windows-native acceptance testing has not been performed. Windows assets are not attached yet. Inability to execute an EXE on macOS is not a corruption test; the cause has not been established.
 
 ### Windows x64
 

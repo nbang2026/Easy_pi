@@ -59,8 +59,8 @@ Use the graphical conversation and workbench or keep a compact terminal workflow
 > Building and uploading are separate steps. A new package absent from Releases is not publicly downloadable there. GitHub-generated source ZIPs and source-with-environment kits are not application installers.
 
 > [!WARNING]
-> **2026-10-31 发布检查 / Publication check**：本次收到的 Windows PiRepair3 安装程序与源码 ZIP 均不完整，未上传到本次发布。Windows 附件待取得完整文件并核验后补充；请勿把当前下载入口视为已有有效的 Windows 附件。<br>
-> The supplied Windows PiRepair3 installer and source ZIP are truncated and excluded from this release. Windows assets are pending intact files and verification; the download entry does not imply a valid Windows asset is currently available.
+> **2026-10-31 发布检查 / Publication check**：本次发布先提供 macOS 附件。Windows PiRepair3 的本地副本存在归档结构与声明长度不一致的检查结果，尚未在 Windows 实机验收，因此暂未附加；这不等于根据 macOS 无法运行 EXE 判断应用损坏，也不代表已确认问题来源。<br>
+> This release currently provides macOS assets. Archive-structure and declared-length checks on the local Windows PiRepair3 copies remain unresolved, and Windows-native acceptance testing has not been performed. Windows assets are not attached yet. Inability to execute an EXE on macOS is not a corruption test; the cause has not been established.
 
 ### Windows x64
 
