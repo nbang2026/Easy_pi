@@ -15,7 +15,7 @@
 | 平台 / Package | 下载 / Download | 当前状态 / Status |
 | --- | --- | --- |
 | **macOS · Apple Silicon / arm64** | **[下载 Mac 安装盘 (.dmg)](https://github.com/nbang2026/Easy_pi/releases/download/v1.1.0/easy_pi-1.1.0-macOS-arm64-20261031.dmg)** | **1.1.0** · 约 299 MiB / about 299 MiB |
-| **Windows · x64** | **[下载 Windows 安装包 (.exe)](https://github.com/nbang2026/Easy_pi/releases/download/v1.1.0/easy_pi_1.1.0_PiRepair3_20261029_x64-setup.exe)** | **1.1.0 PiRepair3** · 维护者提供的原始文件，未完成 Windows 实机验收；检查范围见发布说明。<br>Maintainer-supplied original; Windows-native acceptance pending. See release notes for verification scope. |
+| **Windows · x64** | **[下载 Windows 安装包 (.exe)](https://github.com/nbang2026/Easy_pi/releases/download/v1.1.0/easy_pi_1.1.0_PiRepair3_20261029_x64-setup.exe)** | **1.1.0 PiRepair3** · <br>Maintainer-supplied original; Windows-native acceptance pending. See release notes for verification scope. |
 | macOS 配套源码与环境 / Source + environment | [下载含环境源码 ZIP](https://github.com/nbang2026/Easy_pi/releases/download/v1.1.0/easy_pi-1.1.0-macOS-Source-Environment-20261028184300.zip) | 约 987 MiB；开发包，不是安装程序。<br>About 987 MiB; a developer kit, not an installer. |
 | Windows 源码与 Pi 运行资源 / Source + Pi runtime | [下载 Windows 源码 ZIP](https://github.com/nbang2026/Easy_pi/releases/download/v1.1.0/easy_pi-1.1.0-Windows-Source-20261031.zip) | 当前 1.1.0 工程与 Windows Pi 运行资源；不代表已在 Windows 构建或验证。<br>Current 1.1.0 project and Windows Pi runtime; not a claim of Windows build or native validation. |
 
